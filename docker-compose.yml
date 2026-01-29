@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: quantiq-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: quantiq-kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  postgresql:
+    image: postgres:15-alpine
+    container_name: quantiq-postgres
+    environment:
+      POSTGRES_DB: quantiq
+      POSTGRES_USER: quantiq_user
+      POSTGRES_PASSWORD: quantiq_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quantiq_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quantiq-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: quantiq-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: quantiq_user
+      MONGO_INITDB_ROOT_PASSWORD: quantiq_password
+      MONGO_INITDB_DATABASE: stock_trading
+    command: mongod --auth
+    volumes:
+      - ./data/mongodb:/data/db
+    networks:
+      - quantiq-network
+
+  quantiq-data-engine:
+    build:
+      context: ./quantiq-data-engine
+      dockerfile: Dockerfile
+    container_name: quantiq-data-engine
+    ports:
+      - "10020:8000"
+    depends_on:
+      kafka:
+        condition: service_started
+      mongodb:
+        condition: service_started
+    environment:
+      MONGODB_URI: "mongodb://mongodb:27017"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      FRED_API_KEY: ${FRED_API_KEY}
+    volumes:
+      - ./quantiq-data-engine:/app
+    networks:
+      - quantiq-network
+
+  quantiq-core:
+    build:
+      context: ./quantiq-core
+      dockerfile: Dockerfile
+    container_name: quantiq-core
+    ports:
+      - "10010:8080"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      mongodb:
+        condition: service_started
+    environment:
+      # PostgreSQL
+      DB_HOST: postgresql
+      DB_PORT: 5432
+      DB_NAME: quantiq
+      DB_USER: quantiq_user
+      DB_PASSWORD: quantiq_password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgresql:5432/quantiq
+      SPRING_DATASOURCE_USERNAME: quantiq_user
+      SPRING_DATASOURCE_PASSWORD: quantiq_password
+      # MongoDB
+      SPRING_DATA_MONGODB_URI: "mongodb://mongodb:27017/stock_trading"
+      # Kafka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      # KIS (Korean Investment & Securities) - Temporary
+      KIS_APP_KEY: "test_app_key"
+      KIS_APP_SECRET: "test_app_secret"
+      # Migration
+      DB_DUAL_WRITE: "true"
+      DB_READ_SOURCE: "rdb"
+      RUN_MIGRATION: "true"
+    networks:
+      - quantiq-network
+
+networks:
+  quantiq-network:
+    driver: bridge

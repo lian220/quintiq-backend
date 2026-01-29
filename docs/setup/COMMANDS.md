@@ -1,0 +1,613 @@
+# Quantiq 개발 명령어 가이드
+
+## Docker Compose 명령어
+
+### 기본 작업
+
+```bash
+# 모든 서비스 시작
+docker-compose up -d
+
+# 모든 서비스 정지
+docker-compose stop
+
+# 모든 서비스 재시작
+docker-compose restart
+
+# 모든 서비스 제거
+docker-compose down
+
+# 볼륨 포함 제거 (데이터 삭제)
+docker-compose down -v
+
+# 모든 이미지 삭제
+docker-compose down --rmi all
+```
+
+### 로그 확인
+
+```bash
+# 모든 서비스 로그 실시간
+docker-compose logs -f
+
+# 특정 서비스 로그
+docker-compose logs -f quantiq-core
+docker-compose logs -f quantiq-data-engine
+
+# 최근 100줄만 출력
+docker-compose logs --tail 100
+
+# 타임스탬프 포함
+docker-compose logs -f --timestamps
+```
+
+### 상태 확인
+
+```bash
+# 모든 컨테이너 상태
+docker-compose ps
+
+# 자세한 정보
+docker-compose ps --all
+
+# 네트워크 확인
+docker network ls
+docker network inspect <network-name>
+```
+
+### 개별 서비스 관리
+
+```bash
+# 특정 서비스만 시작
+docker-compose up -d quantiq-core
+
+# 특정 서비스만 재빌드
+docker-compose build --no-cache quantiq-core
+
+# 특정 서비스 컨테이너 내부 접속
+docker-compose exec quantiq-core /bin/sh
+docker-compose exec quantiq-data-engine /bin/bash
+
+# 특정 서비스 재시작
+docker-compose restart mongodb
+```
+
+---
+
+## Spring Boot (quantiq-core)
+
+### 빌드 명령어
+
+```bash
+cd quantiq-core
+
+# 전체 빌드
+./gradlew build
+
+# 테스트 없이 빌드
+./gradlew build -x test
+
+# 캐시 초기화 후 빌드
+./gradlew clean build
+
+# 의존성 다운로드만
+./gradlew dependencies
+
+# 의존성 트리 확인
+./gradlew dependencies --configuration runtimeClasspath
+
+# 빌드 결과 확인
+ls -la build/libs/
+```
+
+### 개발 서버 실행
+
+```bash
+# 기본 실행 (localhost:8080)
+./gradlew bootRun
+
+# 특정 포트에서 실행
+./gradlew bootRun --args='--server.port=8081'
+
+# 활성 프로파일 지정
+./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# 디버그 모드 (포트 5005)
+./gradlew bootRun --debug
+```
+
+### 테스트 실행
+
+```bash
+# 모든 테스트 실행
+./gradlew test
+
+# 특정 테스트 클래스 실행
+./gradlew test --tests UserRepositoryTest
+
+# 특정 테스트 메서드 실행
+./gradlew test --tests UserRepositoryTest.testFindByEmail
+
+# 테스트 커버리지 생성
+./gradlew test jacocoTestReport
+
+# 테스트 결과 확인
+open build/reports/tests/test/index.html
+```
+
+### 코드 품질 및 포맷팅
+
+```bash
+# Kotlin 린트 확인
+./gradlew ktlintCheck
+
+# Kotlin 자동 포맷
+./gradlew ktlintFormat
+
+# 의존성 업데이트 확인
+./gradlew dependencyUpdates
+
+# 빌드 분석
+./gradlew build --scan
+```
+
+### Docker 빌드
+
+```bash
+# 이미지 빌드
+docker build -f quantiq-core/Dockerfile -t quantiq-core:latest quantiq-core/
+
+# 빌드 결과 확인
+docker image ls | grep quantiq-core
+
+# 이미지 실행 (테스트)
+docker run -p 8080:8080 quantiq-core:latest
+```
+
+### IntelliJ IDE
+
+```bash
+# Gradle 새로고침
+View → Tool Windows → Gradle → Reload
+
+# 자동 빌드 활성화
+Build → Build Project (Ctrl+F9)
+
+# 핫 스왑 디버깅
+Run → Run 'QuantiqCoreApplication' in Debug mode
+```
+
+---
+
+## Python (quantiq-data-engine)
+
+### Poetry 명령어
+
+```bash
+cd quantiq-data-engine
+
+# 의존성 설치
+poetry install
+
+# 가상환경 활성화
+poetry shell
+
+# 가상환경 경로 확인
+poetry env info -p
+
+# 의존성 업데이트
+poetry update
+
+# 특정 패키지 업데이트
+poetry update pandas
+
+# 새 패키지 추가
+poetry add package-name
+poetry add --group dev package-name  # 개발 의존성
+
+# 패키지 제거
+poetry remove package-name
+
+# 의존성 목록 확인
+poetry show
+
+# 의존성 트리 확인
+poetry show --tree
+
+# Lock 파일 생성
+poetry lock
+
+# 의존성 검증
+poetry check
+```
+
+### 개발 서버 실행
+
+```bash
+cd quantiq-data-engine
+
+# FastAPI 개발 서버 (자동 리로드)
+poetry run uvicorn src.main:app --reload --port 8000
+
+# 모든 인터페이스 바인딩
+poetry run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+
+# 프로덕션 모드 (리로드 없음)
+poetry run uvicorn src.main:app --port 8000
+
+# 워커 수 지정
+poetry run uvicorn src.main:app --workers 4
+
+# API 문서 접근
+open http://localhost:8000/docs       # Swagger UI
+open http://localhost:8000/redoc      # ReDoc
+```
+
+### 테스트 실행
+
+```bash
+# pytest 설치 (필요시)
+poetry add --group dev pytest
+
+# 모든 테스트 실행
+poetry run pytest
+
+# 특정 테스트 파일 실행
+poetry run pytest tests/test_services.py
+
+# 특정 테스트 함수 실행
+poetry run pytest tests/test_services.py::test_data_collection
+
+# 커버리지 보고서 생성
+poetry run pytest --cov=src --cov-report=html
+
+# 커버리지 확인
+open htmlcov/index.html
+
+# 상세한 출력
+poetry run pytest -v
+
+# 병렬 실행
+poetry run pytest -n auto
+```
+
+### 코드 품질 및 포맷팅
+
+```bash
+# Black (자동 포맷)
+poetry run black src/
+
+# Black 포맷 확인 (변경 없음)
+poetry run black --check src/
+
+# Flake8 (린트)
+poetry run flake8 src/
+
+# isort (import 정렬)
+poetry run isort src/
+
+# mypy (타입 체킹)
+poetry run mypy src/
+
+# pylint (고급 린트)
+poetry run pylint src/
+
+# 모든 검사 한 번에
+poetry run black --check src/ && poetry run flake8 src/ && poetry run mypy src/
+```
+
+### Docker 빌드
+
+```bash
+# 이미지 빌드
+docker build -f quantiq-data-engine/Dockerfile -t quantiq-data-engine:latest quantiq-data-engine/
+
+# 빌드 결과 확인
+docker image ls | grep quantiq-data-engine
+
+# 이미지 실행 (테스트)
+docker run -p 8000:8000 quantiq-data-engine:latest
+```
+
+### VS Code / PyCharm
+
+```bash
+# Python 인터프리터 설정
+poetry env info -p
+
+# IDE에서 설정
+- VS Code: Python: Select Interpreter
+- PyCharm: Settings → Project → Python Interpreter
+```
+
+---
+
+## MongoDB 관리
+
+### 컨테이너 접속
+
+```bash
+# MongoDB 셸 접속
+docker-compose exec mongodb mongosh
+
+# 직접 명령 실행
+docker-compose exec mongodb mongosh --eval "show dbs"
+```
+
+### 기본 명령어 (mongosh 내부)
+
+```javascript
+// 데이터베이스 선택
+use stock_trading
+
+// 컬렉션 조회
+show collections
+
+// 문서 조회
+db.users.find()
+db.stock_recommendations.find()
+
+// 문서 개수
+db.users.countDocuments()
+
+// 조건부 조회
+db.stock_recommendations.find({ signal: "BUY" })
+
+// 문서 삽입
+db.users.insertOne({ email: "test@example.com", name: "Test User" })
+
+// 문서 업데이트
+db.users.updateOne({ email: "test@example.com" }, { $set: { name: "Updated" } })
+
+// 문서 삭제
+db.users.deleteOne({ email: "test@example.com" })
+
+// 인덱스 확인
+db.users.getIndexes()
+
+// 컬렉션 삭제
+db.users.drop()
+```
+
+### 백업 및 복원
+
+```bash
+# 전체 백업
+docker-compose exec mongodb mongodump --out=/backup
+
+# 특정 데이터베이스 백업
+docker-compose exec mongodb mongodump --db stock_trading --out=/backup
+
+# 특정 컬렉션 백업
+docker-compose exec mongodb mongodump --db stock_trading --collection users --out=/backup
+
+# 복원
+docker-compose exec mongodb mongorestore /backup
+
+# 호스트 머신으로 백업 복사
+docker-compose exec mongodb mongodump --out=/tmp/backup
+docker cp quantiq-mongodb:/tmp/backup ./backup
+```
+
+---
+
+## Kafka 관리
+
+### 컨테이너 접속
+
+```bash
+# Kafka 컨테이너 접속
+docker-compose exec kafka bash
+
+# Zookeeper 상태 확인
+zookeeper-shell localhost:2181 ls /
+
+# Kafka 상태 확인
+kafka-broker-api-versions --bootstrap-server localhost:9092
+```
+
+### 토픽 관리
+
+```bash
+# 토픽 생성
+kafka-topics --bootstrap-server localhost:9092 \
+  --create --topic stock-recommendations \
+  --partitions 1 --replication-factor 1
+
+# 토픽 목록
+kafka-topics --bootstrap-server localhost:9092 --list
+
+# 토픽 상세 정보
+kafka-topics --bootstrap-server localhost:9092 \
+  --describe --topic stock-recommendations
+
+# 토픽 파티션 수 변경
+kafka-topics --bootstrap-server localhost:9092 \
+  --alter --topic stock-recommendations --partitions 3
+
+# 토픽 설정 변경
+kafka-configs --bootstrap-server localhost:9092 \
+  --alter --entity-type topics --entity-name stock-recommendations \
+  --add-config retention.ms=86400000
+
+# 토픽 삭제
+kafka-topics --bootstrap-server localhost:9092 \
+  --delete --topic stock-recommendations
+```
+
+### 메시지 테스트
+
+```bash
+# 메시지 소비 (모니터링)
+kafka-console-consumer --bootstrap-server localhost:9092 \
+  --topic stock-recommendations --from-beginning
+
+# 최신 메시지만 소비
+kafka-console-consumer --bootstrap-server localhost:9092 \
+  --topic stock-recommendations
+
+# 컨슈머 그룹 정보
+kafka-consumer-groups --bootstrap-server localhost:9092 \
+  --list
+
+# 특정 그룹 상세 정보
+kafka-consumer-groups --bootstrap-server localhost:9092 \
+  --group my-group --describe
+
+# 메시지 발행 (테스트)
+kafka-console-producer --broker-list localhost:9092 \
+  --topic stock-recommendations
+
+# 프로듀서 성능 테스트
+kafka-producer-perf-test --topic stock-recommendations \
+  --num-records 1000 --record-size 1024 \
+  --throughput -1 --producer-props bootstrap.servers=localhost:9092
+```
+
+---
+
+## 네트워크 및 디버깅
+
+### 포트 확인
+
+```bash
+# 특정 포트 사용 프로세스
+lsof -i :8080
+lsof -i :8000
+lsof -i :9092
+lsof -i :27017
+
+# 프로세스 종료
+lsof -i :8080 -t | xargs kill -9
+```
+
+### 네트워크 테스트
+
+```bash
+# Docker 네트워크 확인
+docker network ls
+
+# 컨테이너 간 통신 테스트
+docker-compose exec quantiq-core ping mongodb
+docker-compose exec quantiq-core ping kafka
+
+# DNS 확인
+docker-compose exec quantiq-core nslookup mongodb
+```
+
+### 환경 변수 확인
+
+```bash
+# 컨테이너 환경 변수
+docker-compose exec quantiq-core env
+
+# 특정 변수 확인
+docker-compose exec quantiq-core printenv SPRING_DATA_MONGODB_URI
+
+# .env 파일 확인
+cat .env
+```
+
+---
+
+## 성능 및 모니터링
+
+### 리소스 사용률 확인
+
+```bash
+# 컨테이너 통계
+docker stats
+
+# 특정 컨테이너
+docker stats quantiq-core
+
+# 파일 시스템 사용
+docker system df
+```
+
+### 로그 분석
+
+```bash
+# 특정 시간의 로그
+docker-compose logs --since 2024-01-01 --until 2024-01-02
+
+# 에러만 필터링
+docker-compose logs | grep ERROR
+
+# 특정 서비스의 마지막 N줄
+docker-compose logs --tail 50 quantiq-core
+```
+
+### CPU/메모리 제한 설정
+
+```yaml
+# docker-compose.yml
+services:
+  quantiq-core:
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+```
+
+---
+
+## CI/CD 및 배포
+
+### 이미지 빌드 및 푸시
+
+```bash
+# 로컬 빌드
+docker-compose build
+
+# 프로덕션 이미지 빌드
+docker build --no-cache -t quantiq-core:prod quantiq-core/
+
+# 이미지 태깅
+docker tag quantiq-core:latest registry.example.com/quantiq-core:latest
+
+# 이미지 푸시
+docker push registry.example.com/quantiq-core:latest
+
+# 이미지 풀
+docker pull registry.example.com/quantiq-core:latest
+```
+
+### 스크립트 자동화
+
+```bash
+#!/bin/bash
+# build.sh - 전체 시스템 빌드
+
+set -e
+
+echo "Building Quantiq..."
+
+# Spring Boot
+cd quantiq-core
+./gradlew clean build -x test
+cd ..
+
+# Python
+cd quantiq-data-engine
+poetry install
+poetry run pytest
+cd ..
+
+# Docker
+docker-compose build
+
+echo "Build completed successfully!"
+```
+
+---
+
+## 다음 단계
+
+- [CODE_STYLE.md](CODE_STYLE.md) - 코딩 컨벤션
+- [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) - 프로젝트 개요
+- [SETUP_GUIDE.md](SETUP_GUIDE.md) - 환경 설정

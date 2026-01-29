@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "quantiq-data-engine"
+version = "0.1.0"
+description = "Data processing engine for Quantiq"
+authors = ["Quantiq Team"]
+readme = "README.md"
+packages = [{include = "quantiq_data_engine", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2.0"
+numpy = "^1.26.0"
+requests = "^2.31.0"
+yfinance = "^0.2.36"
+pymongo = "^4.6.1"
+confluent-kafka = "^2.3.0"
+python-dotenv = "^1.0.1"
+fastapi = "^0.109.0"
+uvicorn = "^0.27.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

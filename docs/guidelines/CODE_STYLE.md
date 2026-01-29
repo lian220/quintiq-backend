@@ -1,0 +1,761 @@
+# Quantiq 코딩 스타일 가이드
+
+## 개요
+
+이 가이드는 Quantiq 프로젝트의 코딩 표준을 정의합니다.
+
+- **Kotlin/Spring Boot**: JetBrains 공식 스타일 가이드 준수
+- **Python**: PEP 8 + Black 포맷터 준수
+
+---
+
+## Kotlin/Spring Boot (quantiq-core)
+
+### 프로젝트 구조
+
+```
+src/main/kotlin/com/quantiq/core/
+├── QuantiqCoreApplication.kt     # 진입점
+├── config/                        # 설정 클래스
+│   ├── KafkaConfig.kt
+│   ├── KisConfig.kt
+│   └── SecurityConfig.kt
+├── domain/                        # 도메인 모델
+│   ├── User.kt
+│   ├── StockRecommendation.kt
+│   └── Trading.kt
+├── repository/                    # Data Access Layer
+│   ├── UserRepository.kt
+│   ├── StockRecommendationRepository.kt
+│   └── TradingRepository.kt
+├── service/                       # 비즈니스 로직
+│   ├── AutoTradingService.kt
+│   ├── BalanceService.kt
+│   └── KafkaMessageListener.kt
+├── controller/                    # REST Controllers
+│   ├── UserController.kt
+│   ├── TradingController.kt
+│   └── RecommendationController.kt
+└── exception/                     # 예외 처리
+    ├── BusinessException.kt
+    └── ApiException.kt
+```
+
+### 명명 규칙
+
+#### 클래스 및 인터페이스
+
+```kotlin
+// 클래스: PascalCase
+class UserRepository { }
+data class User(val id: String, val email: String)
+
+// 인터페이스: PascalCase
+interface UserService { }
+
+// Enum: PascalCase
+enum class Signal { BUY, SELL, HOLD }
+
+// Annotation: PascalCase
+@Target(AnnotationTarget.CLASS)
+annotation class Cached
+```
+
+#### 함수 및 변수
+
+```kotlin
+// 함수: camelCase
+fun getUserById(userId: String): User? { }
+fun executeAutoTrade(recommendation: StockRecommendation) { }
+
+// 변수: camelCase
+val userName = "John"
+var accountBalance = 1000000
+
+// 상수: UPPER_SNAKE_CASE (companion object 내)
+companion object {
+    private const val KAFKA_TOPIC = "stock-recommendations"
+    private const val MAX_RETRY_COUNT = 3
+}
+
+// Boolean 변수: is/has 접두사
+val isActive = true
+val hasPermission = false
+```
+
+#### 파라미터
+
+```kotlin
+fun processRecommendation(
+    recommendation: StockRecommendation,
+    userId: String,
+    executeImmediately: Boolean = false
+) { }
+
+// 람다: 간단한 이름 사용
+list.map { item -> item.price }
+list.filter { it.signal == Signal.BUY }
+```
+
+### 타입 힌트 및 문서화
+
+#### Public API는 항상 명시적 타입 선언
+
+```kotlin
+// Good
+fun getUserById(userId: String): User? {
+    return userRepository.findById(userId)
+}
+
+// Bad - 추론에 의존
+fun getUserById(userId: String) = userRepository.findById(userId)
+
+// Good - 명시적 반환 타입
+fun getRecommendations(): List<StockRecommendation> {
+    return recommendationRepository.findAll()
+}
+```
+
+#### KDoc 문서화
+
+```kotlin
+/**
+ * 주식 거래를 자동으로 실행합니다.
+ *
+ * 이 메서드는 주어진 추천 신호에 따라 KIS API를 통해
+ * 실제 거래 주문을 생성합니다.
+ *
+ * @param recommendation 주식 추천 신호
+ * @param userId 거래를 실행할 사용자 ID
+ * @return 거래 실행 결과
+ * @throws BusinessException 거래 실패 시
+ * @throws KisApiException KIS API 오류 시
+ *
+ * @since 1.0
+ * @author Quantiq Team
+ */
+fun executeAutoTrade(
+    recommendation: StockRecommendation,
+    userId: String
+): TradingResult
+```
+
+### Spring Boot 패턴
+
+#### Repository
+
+```kotlin
+interface UserRepository : MongoRepository<User, String> {
+    fun findByEmail(email: String): User?
+    fun findAllByIsActive(isActive: Boolean): List<User>
+
+    @Query("{ 'createdAt': { \$gt: ?0 } }")
+    fun findRecentUsers(since: LocalDateTime): List<User>
+}
+```
+
+#### Service
+
+```kotlin
+@Service
+class AutoTradingService(
+    private val stockRecommendationRepository: StockRecommendationRepository,
+    private val balanceService: BalanceService,
+    private val kisClient: KisClient,
+    private val logger: Logger = LoggerFactory.getLogger(this::class.java)
+) {
+
+    @Transactional
+    fun executeAutoTrade(recommendation: StockRecommendation, userId: String) {
+        try {
+            // 비즈니스 로직
+            val result = kisClient.placeTrade(recommendation.ticker, recommendation.quantity)
+            logger.info("Trade executed: $result")
+        } catch (e: KisApiException) {
+            logger.error("Trade execution failed", e)
+            throw BusinessException("Trade execution failed: ${e.message}", e)
+        }
+    }
+}
+```
+
+#### Controller
+
+```kotlin
+@RestController
+@RequestMapping("/api/trading")
+class TradingController(
+    private val autoTradingService: AutoTradingService
+) {
+
+    @PostMapping("/execute")
+    fun executeTrade(
+        @RequestBody request: ExecuteTradeRequest,
+        @RequestHeader("Authorization") token: String
+    ): ResponseEntity<TradingResult> {
+        val result = autoTradingService.executeAutoTrade(
+            request.recommendation,
+            request.userId
+        )
+        return ResponseEntity.ok(result)
+    }
+
+    @GetMapping("/history")
+    fun getTradingHistory(
+        @RequestParam userId: String,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): ResponseEntity<Page<Trading>> {
+        // 구현
+    }
+}
+```
+
+#### Configuration
+
+```kotlin
+@Configuration
+@EnableKafka
+class KafkaConfig {
+
+    @Bean
+    fun consumerFactory(): ConsumerFactory<String, StockRecommendation> {
+        val props = mapOf(
+            ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to "kafka:9092",
+            ConsumerConfig.GROUP_ID_CONFIG to "quantiq-core",
+            ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java,
+            ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG to JsonDeserializer::class.java
+        )
+        return DefaultKafkaConsumerFactory(props)
+    }
+
+    @Bean
+    fun kafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, StockRecommendation> {
+        val factory = ConcurrentKafkaListenerContainerFactory<String, StockRecommendation>()
+        factory.consumerFactory = consumerFactory()
+        return factory
+    }
+}
+```
+
+### 포맷팅
+
+#### 들여쓰기 및 라인
+
+```kotlin
+// 들여쓰기: 4 spaces
+class Example {
+    fun method() {
+        if (condition) {
+            // 4 spaces 들여쓰기
+        }
+    }
+}
+
+// 라인 길이: 120자 권장 (엄격하지 않음)
+// 너무 긴 라인은 줄 바꿈
+val result = complexCalculation(
+    param1,
+    param2,
+    param3
+)
+```
+
+#### 임포트 정렬
+
+```kotlin
+// 1. java.* 패키지
+import java.time.LocalDateTime
+import java.util.UUID
+
+// 2. javax.* 패키지
+import javax.validation.Valid
+
+// 3. 외부 라이브러리
+import org.springframework.stereotype.Service
+import org.springframework.kafka.annotation.KafkaListener
+
+// 4. 프로젝트 내부
+import com.quantiq.core.domain.User
+import com.quantiq.core.repository.UserRepository
+
+// 5. 별도 구분 후 와일드카드 임포트 (선택)
+import kotlin.collections.*
+```
+
+### 에러 처리
+
+```kotlin
+// Custom Exception
+class BusinessException(message: String, cause: Throwable? = null) :
+    RuntimeException(message, cause)
+
+class KisApiException(message: String, val code: String, cause: Throwable? = null) :
+    RuntimeException(message, cause)
+
+// 처리 패턴
+@Service
+class TradingService {
+    fun executeWithRetry(recommendation: StockRecommendation, maxRetries: Int = 3) {
+        repeat(maxRetries) { attempt ->
+            try {
+                executeAutoTrade(recommendation)
+                return
+            } catch (e: KisApiException) {
+                if (attempt == maxRetries - 1) throw e
+                logger.warn("Attempt ${attempt + 1} failed, retrying...", e)
+                Thread.sleep(1000 * (attempt + 1).toLong())  // Exponential backoff
+            }
+        }
+    }
+}
+```
+
+---
+
+## Python (quantiq-data-engine)
+
+### 프로젝트 구조
+
+```
+src/
+├── main.py                   # FastAPI 애플리케이션
+├── config.py                 # 환경 변수 및 설정
+├── db.py                     # MongoDB 연결
+├── services/
+│   ├── __init__.py
+│   ├── data_collector.py     # 주식 데이터 수집
+│   ├── technical_analysis.py # 기술적 분석
+│   └── trading_signals.py    # 거래 신호 생성
+├── events/
+│   ├── __init__.py
+│   └── publisher.py          # Kafka 메시지 발행
+├── models/
+│   ├── __init__.py
+│   ├── stock.py              # 주식 모델
+│   ├── signal.py             # 신호 모델
+│   └── analysis.py           # 분석 결과 모델
+└── utils/
+    ├── __init__.py
+    ├── logger.py             # 로깅 설정
+    └── decorators.py         # 데코레이터
+```
+
+### 명명 규칙
+
+#### 모듈 및 파일
+
+```python
+# 모듈: snake_case
+# data_collector.py
+# technical_analysis.py
+# kis_api_client.py
+```
+
+#### 클래스
+
+```python
+# 클래스: PascalCase
+class DataCollector:
+    pass
+
+class TechnicalAnalyzer:
+    pass
+
+class StockRecommendation:
+    pass
+```
+
+#### 함수 및 변수
+
+```python
+# 함수: snake_case
+def collect_stock_data(ticker: str) -> pd.DataFrame:
+    pass
+
+def calculate_moving_average(data: pd.DataFrame, window: int) -> pd.Series:
+    pass
+
+# 변수: snake_case
+user_name = "John"
+account_balance = 1000000
+kafka_bootstrap_servers = "localhost:9092"
+
+# Private: 언더스코어 접두사
+_internal_config = {}
+_cache_store = {}
+
+# 상수: UPPER_SNAKE_CASE
+KAFKA_TOPIC_RECOMMENDATIONS = "stock-recommendations"
+MAX_RETRY_ATTEMPTS = 3
+TIMEOUT_SECONDS = 30
+```
+
+#### Boolean
+
+```python
+# is/has 접두사
+is_active = True
+has_data = False
+should_retry = True
+is_valid = False
+```
+
+### 타입 힌트 (PEP 484)
+
+```python
+from typing import List, Optional, Dict, Tuple
+import pandas as pd
+
+# 함수 타입 힌트
+def collect_data(ticker: str) -> Optional[pd.DataFrame]:
+    """주식 데이터를 수집합니다."""
+    pass
+
+def analyze_signals(
+    data: pd.DataFrame,
+    window_size: int = 20
+) -> List[Dict[str, any]]:
+    """기술적 신호를 분석합니다."""
+    pass
+
+# 클래스 타입 힌트
+class DataCollector:
+    def __init__(self, api_key: str):
+        self.api_key: str = api_key
+        self.cache: Dict[str, pd.DataFrame] = {}
+
+    def get_data(self, ticker: str) -> Optional[pd.DataFrame]:
+        pass
+```
+
+### 문서화 (Google Style)
+
+```python
+def execute_trading(ticker: str, quantity: int, price: float) -> bool:
+    """
+    거래를 실행합니다.
+
+    주어진 주식과 수량으로 거래 주문을 생성합니다.
+    거래 가격이 현재 시장 가격의 5% 범위 내에서 실행됩니다.
+
+    Args:
+        ticker: 주식 티커 (예: 'AAPL')
+        quantity: 주문 수량
+        price: 주문 가격
+
+    Returns:
+        bool: 거래 성공 여부
+
+    Raises:
+        ValueError: 유효하지 않은 입력값 (quantity <= 0, price <= 0)
+        KisApiException: KIS API 오류
+        ConnectionError: 네트워크 연결 실패
+
+    Examples:
+        >>> execute_trading('AAPL', 100, 150.50)
+        True
+
+        >>> execute_trading('INVALID', -10, 0)
+        ValueError: Quantity must be positive
+
+    Note:
+        이 함수는 동기 방식으로 동작하며, 거래가 완료될 때까지 블로킹됩니다.
+    """
+    pass
+```
+
+### FastAPI 패턴
+
+```python
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import List
+
+app = FastAPI(
+    title="Quantiq Data Engine",
+    description="데이터 수집 및 분석 엔진",
+    version="1.0.0"
+)
+
+# Pydantic 모델
+class StockData(BaseModel):
+    ticker: str
+    price: float
+    volume: int
+    timestamp: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ticker": "AAPL",
+                "price": 150.25,
+                "volume": 1000000,
+                "timestamp": "2024-01-01T10:00:00Z"
+            }
+        }
+
+class TradingSignal(BaseModel):
+    ticker: str
+    signal: str = Field(..., description="BUY, SELL, HOLD")
+    confidence: float = Field(..., ge=0, le=1)
+    timestamp: str
+
+# 의존성
+async def get_collector() -> DataCollector:
+    return DataCollector(api_key=os.getenv("API_KEY"))
+
+# 라우트
+@app.get("/health")
+async def health_check() -> dict:
+    """헬스 체크"""
+    return {"status": "healthy"}
+
+@app.get("/recommendations", response_model=List[TradingSignal])
+async def get_recommendations(
+    limit: int = 10,
+    signal: Optional[str] = None
+) -> List[TradingSignal]:
+    """
+    거래 추천 신호를 조회합니다.
+
+    Args:
+        limit: 반환할 최대 신호 수
+        signal: 신호 필터 (BUY, SELL, HOLD)
+
+    Returns:
+        거래 신호 목록
+    """
+    pass
+
+@app.post("/analyze/{ticker}", response_model=dict)
+async def analyze_stock(
+    ticker: str,
+    data: StockData,
+    collector: DataCollector = Depends(get_collector)
+) -> dict:
+    """특정 주식에 대해 기술적 분석을 수행합니다."""
+    pass
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request, exc):
+    return HTTPException(
+        status_code=400,
+        detail=str(exc)
+    )
+```
+
+### 포맷팅 (PEP 8 + Black)
+
+#### 들여쓰기 및 라인
+
+```python
+# 들여쓰기: 4 spaces
+def function():
+    if condition:
+        # 4 spaces
+        pass
+
+# 라인 길이: 88자 (Black 기본값)
+# 긴 라인은 자동으로 나뉨
+result = some_function(
+    parameter1,
+    parameter2,
+    parameter3
+)
+```
+
+#### 임포트 정렬 (isort)
+
+```python
+# 1. 표준 라이브러리
+import os
+import sys
+from datetime import datetime
+from typing import List, Optional
+
+# 2. 서드파티 라이브러리
+import pandas as pd
+import numpy as np
+from fastapi import FastAPI
+from pymongo import MongoClient
+
+# 3. 로컬 프로젝트
+from config import MONGODB_URI
+from services.data_collector import DataCollector
+from models.stock import StockData
+```
+
+### 에러 처리
+
+```python
+# Custom Exception
+class QuantiqException(Exception):
+    """Quantiq 기본 예외"""
+    pass
+
+class KisApiException(QuantiqException):
+    """KIS API 예외"""
+    def __init__(self, message: str, code: str, status_code: int):
+        self.code = code
+        self.status_code = status_code
+        super().__init__(message)
+
+class DataCollectionException(QuantiqException):
+    """데이터 수집 예외"""
+    pass
+
+# 처리 패턴
+def collect_with_retry(ticker: str, max_retries: int = 3) -> Optional[pd.DataFrame]:
+    """재시도 로직과 함께 데이터를 수집합니다."""
+    for attempt in range(max_retries):
+        try:
+            return collect_data(ticker)
+        except (ConnectionError, TimeoutError) as e:
+            if attempt == max_retries - 1:
+                raise DataCollectionException(
+                    f"Failed to collect data after {max_retries} attempts"
+                ) from e
+
+            wait_time = 2 ** attempt  # Exponential backoff
+            logger.warning(
+                f"Attempt {attempt + 1} failed, retrying in {wait_time}s",
+                exc_info=True
+            )
+            time.sleep(wait_time)
+```
+
+### 테스트 (pytest)
+
+```python
+# tests/test_data_collector.py
+import pytest
+from unittest.mock import Mock, patch
+from services.data_collector import DataCollector
+
+@pytest.fixture
+def collector():
+    return DataCollector(api_key="test_key")
+
+def test_collect_data_success(collector):
+    """정상적인 데이터 수집 테스트"""
+    with patch('yfinance.download') as mock_download:
+        mock_download.return_value = pd.DataFrame(...)
+        result = collector.collect("AAPL")
+        assert result is not None
+        mock_download.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_publish_signal_failure():
+    """메시지 발행 실패 테스트"""
+    with pytest.raises(KafkaException):
+        await publisher.publish_signal(None)
+```
+
+---
+
+## 공통 컨벤션
+
+### 환경 변수 관리
+
+```
+# .env 파일 (Git에서 제외)
+MONGODB_URI=mongodb://localhost:27017
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+API_KEY=your_secret_key
+
+# .env.example 파일 (Git 커밋)
+MONGODB_URI=mongodb://localhost:27017
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+API_KEY=your_secret_key  # 명시적으로 마스크하지 않음
+```
+
+### 로깅
+
+#### Kotlin (SLF4J)
+
+```kotlin
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger(this::class.java)
+
+logger.debug("Debug message")
+logger.info("Trading executed for {}", ticker)
+logger.warn("Retry attempt {} failed", attempt, exception)
+logger.error("Critical error occurred", exception)
+```
+
+#### Python (logging)
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+logger.debug("Debug message")
+logger.info("Trading executed for %s", ticker)
+logger.warning("Retry attempt %d failed", attempt, exc_info=True)
+logger.error("Critical error occurred", exc_info=True)
+```
+
+### 커밋 메시지
+
+```
+[quantiq-core] feat: 자동매매 신호 수신 구현
+[quantiq-data-engine] fix: 데이터 수집 오류 처리
+[all] chore: Docker Compose 설정 업데이트
+
+상세 설명 (선택사항):
+- 첫 번째 변경사항
+- 두 번째 변경사항
+- 테스트 완료
+```
+
+### 주석
+
+#### 해야 할 일 / 수정 필요
+
+```kotlin
+// TODO: 성능 최적화 필요 - 대량 데이터에 대한 O(n²) 알고리즘 개선 필요
+// FIXME: 때때로 null을 반환함 - 모든 경로에서 안전한 처리 필요
+// NOTE: 특정 순서로 호출되어야 함 - initialize() 후에만 사용 가능
+// HACK: 임시 해결책 - API 응답 형식이 변경되면 수정 필요
+```
+
+#### 복잡한 로직 설명
+
+```kotlin
+// KIS API 응답의 timestamp를 UTC로 변환
+// KIS는 KST(UTC+9)로 응답하므로 9시간 빼야 함
+val utcTime = kisTimestamp.minusHours(9)
+
+// Buy 신호는 SMA < EMA 교점, Sell 신호는 SMA > EMA 교점
+// (짧은 설명보다는 공식이나 참고자료 추가가 좋음)
+```
+
+---
+
+## 체크리스트
+
+작업 완료 전 확인:
+
+- [ ] 모든 public API에 명시적 타입 선언
+- [ ] KDoc / docstring 작성
+- [ ] 복잡한 로직에 주석 추가
+- [ ] 환경 변수 사용 확인
+- [ ] 에러 처리 구현
+- [ ] 로깅 추가
+- [ ] 자동 포맷팅 실행 (ktlintFormat / black)
+- [ ] 린트 확인 (ktlintCheck / flake8)
+- [ ] 테스트 작성 및 통과
+- [ ] 커밋 메시지 확인
+
+---
+
+## 참고 자료
+
+- [Kotlin Style Guide](https://kotlinlang.org/docs/coding-conventions.html)
+- [PEP 8](https://www.python.org/dev/peps/pep-0008/)
+- [PEP 484 - Type Hints](https://www.python.org/dev/peps/pep-0484/)
+- [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
+- [Spring Boot Best Practices](https://spring.io/guides)
