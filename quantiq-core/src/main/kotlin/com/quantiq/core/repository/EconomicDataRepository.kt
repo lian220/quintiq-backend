@@ -1,0 +1,10 @@
+package com.quantiq.core.repository
+
+import com.quantiq.core.domain.EconomicData
+import org.springframework.data.mongodb.repository.MongoRepository
+import org.springframework.stereotype.Repository
+
+@Repository
+interface EconomicDataRepository : MongoRepository<EconomicData, String> {
+    fun findFirstByOrderByDateDesc(): EconomicData?
+}

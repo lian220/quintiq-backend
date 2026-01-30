@@ -52,3 +52,14 @@ class EventPublisher:
             logger.error(f"Failed to publish event to {topic}: {e}")
             import traceback
             logger.error(traceback.format_exc())
+
+def publish_event(event_type: str, payload: dict):
+    """
+    Helper function to publish standardized events to the completion topic.
+    """
+    message = {
+        "type": event_type,
+        "timestamp": str(logging.Formatter('%(asctime)s').format(logging.LogRecord('', 0, '', 0, '', None, None))), # Simple timestamp
+        **payload
+    }
+    EventPublisher.publish(settings.KAFKA_TOPIC_ANALYSIS_COMPLETED, message)

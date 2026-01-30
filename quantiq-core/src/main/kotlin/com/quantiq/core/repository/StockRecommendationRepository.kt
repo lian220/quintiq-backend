@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository
 @Repository
 interface StockRecommendationRepository : MongoRepository<StockRecommendation, String> {
     fun findByDateAndIsRecommendedTrue(date: String): List<StockRecommendation>
+    fun findByTickerAndDate(ticker: String, date: String): StockRecommendation?
 }

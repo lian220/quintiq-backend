@@ -9,7 +9,7 @@ class KisConfig {
 
     @Value("\${kis.app-secret}") lateinit var appSecret: String
 
-    @Value("\${kis.base-url}") var baseUrl: String = "https://openapi.koreainvestment.com:9443"
+    @Value("\${kis.base-url:https://openapi.koreainvestment.com:9443}") lateinit var baseUrl: String
 
     @Value("\${kis.account-no}") lateinit var accountNo: String
 }
