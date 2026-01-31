@@ -1,6 +1,7 @@
 """Economic Data Repository - MongoDB 데이터 접근"""
 import logging
 from typing import Dict, Any, List
+from datetime import datetime
 from src.core.database import MongoDB
 
 logger = logging.getLogger(__name__)
@@ -54,3 +55,44 @@ class EconomicDataRepository:
         except Exception as e:
             logger.error(f"지표 조회 실패: {e}")
             return []
+
+    def upsert_daily_data(self, date: str, data: Dict[str, Any]) -> bool:
+        """
+        daily_stock_data 컬렉션에 날짜별 데이터를 upsert합니다.
+
+        Args:
+            date: 날짜 (YYYY-MM-DD 형식)
+            data: {
+                "fred_indicators": {"GDP": 123.45, ...},
+                "yfinance_indicators": {"SP500": 4500.12, ...}
+            }
+
+        Returns:
+            성공 여부
+        """
+        try:
+            if self.db is None:
+                logger.error("MongoDB 연결 없음")
+                return False
+
+            collection = self.db["daily_stock_data"]
+
+            # 해당 날짜의 문서를 upsert
+            update_data = {
+                "$set": {
+                    **data,
+                    "updated_at": datetime.now()
+                }
+            }
+
+            result = collection.update_one(
+                {"date": date},
+                update_data,
+                upsert=True
+            )
+
+            return result.acknowledged
+
+        except Exception as e:
+            logger.error(f"Daily data upsert 실패 (date={date}): {e}")
+            return False
