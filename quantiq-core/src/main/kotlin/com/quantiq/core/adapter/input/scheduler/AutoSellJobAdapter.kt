@@ -32,16 +32,16 @@ class AutoSellJobAdapter : Job {
             }
 
             val triggerName = context?.trigger?.key?.name ?: "unknown"
-            logger.info("=" * 80)
+            logger.info("=".repeat(80))
             logger.info("자동 매도 체크 시작 [Trigger: $triggerName]")
-            logger.info("=" * 80)
+            logger.info("=".repeat(80))
 
             // TODO: AutoTradingUseCase.checkAndExecuteSellOrders() 호출
             // 현재는 로깅만 수행
             logger.info("📊 매도 조건 확인 중...")
             logger.info("✅ 매도 체크 완료")
 
-            logger.info("=" * 80)
+            logger.info("=".repeat(80))
         } catch (e: Exception) {
             logger.error("❌ 자동 매도 Job 실행 중 오류", e)
             throw JobExecutionException(e)
