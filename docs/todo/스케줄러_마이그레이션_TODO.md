@@ -721,14 +721,90 @@ ANALYZE trading_configs;
 
 ---
 
+## 📅 누락된 스케줄러 구현 TODO
+
+### ⚠️ 현재 구현 상태 (2025-01-31 확인)
+
+**✅ 구현 완료 (2/8)**
+- [x] SCHEDULE_ECONOMIC_DATA_UPDATE_1 (06:05) - 경제 데이터 업데이트
+- [x] SCHEDULE_PARALLEL_ANALYSIS (23:05) - 병렬 분석
+
+**❌ 미구현 (6/8)**
+- [ ] SCHEDULE_ECONOMIC_DATA_UPDATE_2 (23:00) - 경제 데이터 재수집 + Vertex AI 예측 병렬 실행
+- [ ] SCHEDULE_VERTEX_AI_PREDICTION (23:00) - 레거시 (UPDATE_2와 병합 예정)
+- [ ] SCHEDULE_COMBINED_ANALYSIS (23:45) - 통합 분석
+- [ ] SCHEDULE_AUTO_BUY (23:50) - 자동 매수 실행
+- [ ] SCHEDULE_CLEANUP_ORDERS (06:30) - 주문 정리
+- [ ] SCHEDULE_PORTFOLIO_PROFIT_REPORT (07:00) - 포트폴리오 수익 보고
+
+### 🎯 구현 계획
+
+#### 1단계: Job Adapter 클래스 생성
+```
+quantiq-core/src/main/kotlin/com/quantiq/core/adapter/input/scheduler/
+
+필요 파일:
+- EconomicDataUpdate2JobAdapter.kt (23:00)
+- CombinedAnalysisJobAdapter.kt (23:45)
+- AutoBuyJobAdapter.kt (23:50)
+- CleanupOrdersJobAdapter.kt (06:30)
+- PortfolioProfitReportJobAdapter.kt (07:00)
+```
+
+#### 2단계: QuartzConfig.kt 업데이트
+```kotlin
+// 추가할 Bean들:
+@Bean fun economicDataUpdate2JobDetail()
+@Bean fun economicDataUpdate2Trigger() → "0 0 23 * * ?"
+
+@Bean fun combinedAnalysisJobDetail()
+@Bean fun combinedAnalysisTrigger() → "0 45 23 * * ?"
+
+@Bean fun autoBuyJobDetail()
+@Bean fun autoBuyTrigger() → "0 50 23 * * ?"
+
+@Bean fun cleanupOrdersJobDetail()
+@Bean fun cleanupOrdersTrigger() → "0 30 6 * * ?"
+
+@Bean fun portfolioProfitReportJobDetail()
+@Bean fun portfolioProfitReportTrigger() → "0 0 7 * * ?"
+```
+
+#### 3단계: UseCase 연결
+```
+각 Job Adapter가 호출할 UseCase:
+- EconomicDataUpdate2 → EconomicDataUseCase + VertexAIUseCase
+- CombinedAnalysis → AnalysisUseCase
+- AutoBuy → TradingUseCase
+- CleanupOrders → OrderManagementUseCase
+- PortfolioProfitReport → ReportingUseCase
+```
+
+### 📊 우선순위
+
+**High Priority (자동 매매 핵심)**
+1. SCHEDULE_AUTO_BUY (23:50) - 자동 매수 실행
+2. SCHEDULE_ECONOMIC_DATA_UPDATE_2 (23:00) - 데이터 재수집
+
+**Medium Priority (분석 및 보고)**
+3. SCHEDULE_COMBINED_ANALYSIS (23:45) - 통합 분석
+4. SCHEDULE_PORTFOLIO_PROFIT_REPORT (07:00) - 수익 보고
+
+**Low Priority (유지보수)**
+5. SCHEDULE_CLEANUP_ORDERS (06:30) - 주문 정리
+
+---
+
 **다음 액션:**
 
 1. ✅ 현재 분석 기능 검증 (ANALYSIS_VERIFICATION_CHECKLIST.md)
 2. ✅ 마이그레이션 계획 검토 (이 문서)
-3. 🚀 **내일부터: Day 1 환경 준비 시작**
+3. ✅ 누락된 스케줄러 확인 및 TODO 추가 (2025-01-31)
+4. 🚀 **다음: 누락된 스케줄러 구현 시작**
+5. 🚀 **그 다음: Day 1 환경 준비 시작**
 
 ---
 
-**마지막 업데이트:** 2025-01-29
-**버전:** 1.0
-**상태:** 준비 완료 ✅
+**마지막 업데이트:** 2025-01-31
+**버전:** 1.1
+**상태:** 스케줄러 TODO 추가 완료 ✅
