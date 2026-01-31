@@ -1,6 +1,6 @@
 package com.quantiq.core.application.stock
 
-import com.quantiq.core.repository.*
+import com.quantiq.core.adapter.output.persistence.mongodb.*
 import java.time.LocalDate
 import org.springframework.stereotype.Service
 

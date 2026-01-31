@@ -3,8 +3,8 @@ package com.quantiq.core.application.balance
 import com.quantiq.core.domain.trading.port.output.TradingApiPort
 import com.quantiq.core.adapter.output.persistence.jpa.AccountBalanceEntity
 import com.quantiq.core.adapter.output.persistence.jpa.UserEntity
-import com.quantiq.core.repository.jpa.AccountBalanceJpaRepository
-import com.quantiq.core.repository.jpa.UserJpaRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.jpa.AccountBalanceJpaRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.jpa.UserJpaRepository
 import java.math.BigDecimal
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

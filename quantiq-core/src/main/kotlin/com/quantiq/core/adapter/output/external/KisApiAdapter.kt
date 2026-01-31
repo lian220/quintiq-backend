@@ -3,7 +3,7 @@ package com.quantiq.core.adapter.output.external
 import com.quantiq.core.config.KisConfig
 import com.quantiq.core.domain.KisToken
 import com.quantiq.core.domain.trading.port.output.TradingApiPort
-import com.quantiq.core.repository.KisTokenRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.KisTokenRepository
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock

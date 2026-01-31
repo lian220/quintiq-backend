@@ -1,11 +1,11 @@
 package com.quantiq.core.application.trading
 
 import com.quantiq.core.adapter.output.persistence.jpa.*
-import com.quantiq.core.repository.StockRecommendationRepository
-import com.quantiq.core.repository.jpa.TradingConfigJpaRepository
-import com.quantiq.core.repository.jpa.TradeJpaRepository
-import com.quantiq.core.repository.jpa.TradeSignalExecutedJpaRepository
-import com.quantiq.core.repository.jpa.UserJpaRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.StockRecommendationRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.jpa.TradingConfigJpaRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.jpa.TradeJpaRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.jpa.TradeSignalExecutedJpaRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.jpa.UserJpaRepository
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate

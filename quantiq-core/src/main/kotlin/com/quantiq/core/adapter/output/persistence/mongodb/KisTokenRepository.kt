@@ -1,4 +1,4 @@
-package com.quantiq.core.repository
+package com.quantiq.core.adapter.output.persistence.mongodb
 
 import com.quantiq.core.domain.KisToken
 import org.springframework.data.mongodb.repository.MongoRepository
