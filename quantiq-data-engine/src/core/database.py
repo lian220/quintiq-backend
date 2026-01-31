@@ -1,5 +1,5 @@
 from pymongo import MongoClient
-from src.config import settings
+from src.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)

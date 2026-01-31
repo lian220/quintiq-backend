@@ -71,12 +71,74 @@ spring:
       acks: all
       retries: 3
 
+  # ============================================
+  # Quartz Scheduler Configuration
+  # ============================================
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never  # Flyway로 관리
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: quantiqScheduler
+            instanceId: AUTO
+          threadPool:
+            class: org.quartz.simpl.SimpleThreadPool
+            threadCount: 10
+            threadPriority: 5
+          jobStore:
+            class: org.quartz.impl.jdbcjobstore.JobStoreTX
+            driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+            tablePrefix: quartz_
+            isClustered: false
+            useProperties: false
+            dataSource: quartzDataSource
+          dataSource:
+            quartzDataSource:
+              driver: org.postgresql.Driver
+              URL: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:quantiq}
+              user: ${DB_USER:quantiq_user}
+              password: ${DB_PASSWORD:quantiq_password}
+              maxConnections: 5
+              provider: hikaricp
+
+  # ============================================
+  # Kafka Configuration (Already set at line 66)
+  # ============================================
+  # Configuration moved to top-level kafka section for consistency
+
 logging:
   level:
     root: INFO
     com.quantiq: DEBUG
     org.springframework.data.mongodb: DEBUG
     org.hibernate.SQL: DEBUG
+
+# ============================================
+# SpringDoc OpenAPI (Swagger) Configuration
+# ============================================
+springdoc:
+  api-docs:
+    path: /api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+    display-request-duration: true
+    disable-swagger-default-url: true
+  show-actuator: false
+
+# ============================================
+# Slack Configuration
+# ============================================
+slack:
+  webhook-url: ${SLACK_WEBHOOK_URL:}
+  bot-token: ${SLACK_BOT_TOKEN:}
+  channel: ${SLACK_CHANNEL:#trading-alerts}
 
 # ============================================
 # KIS Configuration (Korean Investment & Securities)

@@ -41,6 +41,12 @@ dependencies {
     // Environment variables
     implementation("io.github.cdimascio:java-dotenv:5.3.1")
 
+    // Quartz Scheduler
+    implementation("org.springframework.boot:spring-boot-starter-quartz")
+
+    // SpringDoc OpenAPI (Swagger)
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0")
+
     // Database (H2 for testing)
     runtimeOnly("com.h2database:h2")
 

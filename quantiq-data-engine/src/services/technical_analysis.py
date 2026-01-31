@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import logging
-from src.db import MongoDB
+from src.core.database import MongoDB
 
 logger = logging.getLogger(__name__)
 

@@ -2,8 +2,8 @@ import logging
 import requests
 import time
 from datetime import datetime, timedelta
-from src.db import MongoDB
-from src.config import settings
+from src.core.database import MongoDB
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 

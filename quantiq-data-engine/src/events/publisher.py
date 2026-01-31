@@ -1,65 +1,116 @@
+"""
+Event Publisher for Quantiq Data Engine
+
+Kafka로 이벤트를 발행하는 범용 서비스입니다.
+"""
+
 from confluent_kafka import Producer
 import json
 import logging
-from src.config import settings
+from src.core.config import settings
+from src.events.schema import BaseEvent
 
 logger = logging.getLogger(__name__)
 
+
 class EventPublisher:
+    """
+    Kafka Event Publisher (Singleton Pattern)
+    """
     _producer = None
-    
+
     @classmethod
     def get_producer(cls):
+        """Kafka Producer 인스턴스를 반환합니다 (Singleton)"""
         if cls._producer is None:
             try:
                 conf = {
                     'bootstrap.servers': settings.KAFKA_BOOTSTRAP_SERVERS,
                     'client.id': 'quantiq-data-engine',
-                    # Add robustness settings
-                    'acks': 'all',
-                    'retries': 3
+                    # Reliability settings
+                    'acks': 'all',  # 모든 replica 확인
+                    'retries': 3,  # 재시도 3회
+                    'retry.backoff.ms': 100,  # 재시도 간격 100ms
+                    # Performance settings
+                    'batch.size': 16384,  # 16KB
+                    'linger.ms': 10,  # 10ms 대기 후 배치 전송
+                    'compression.type': 'snappy',  # 압축
+                    # Idempotence for exactly-once semantics
+                    'enable.idempotence': True
                 }
                 cls._producer = Producer(conf)
-                logger.info(f"Kafka producer created for {settings.KAFKA_BOOTSTRAP_SERVERS}")
+                logger.info(f"📡 Kafka producer created for {settings.KAFKA_BOOTSTRAP_SERVERS}")
             except Exception as e:
-                logger.error(f"Failed to create Kafka producer: {e}")
+                logger.error(f"❌ Failed to create Kafka producer: {e}")
                 raise
         return cls._producer
 
     @classmethod
     def delivery_report(cls, err, msg):
-        """Called once for each message produced to indicate delivery result."""
+        """메시지 전송 결과 콜백"""
         if err is not None:
-            logger.error(f'Message delivery failed: {err}')
+            logger.error(f'❌ Message delivery failed: {err}')
         else:
-            logger.info(f'Message delivered to {msg.topic()} [{msg.partition()}]')
+            logger.info(f'✅ Message delivered to {msg.topic()} [{msg.partition()}]')
 
     @classmethod
-    def publish(cls, topic: str, message: dict):
+    def publish(cls, topic: str, event: BaseEvent):
+        """
+        이벤트를 Kafka 토픽에 발행합니다
+
+        Args:
+            topic: Kafka 토픽명
+            event: 발행할 이벤트 (BaseEvent)
+        """
         try:
             p = cls.get_producer()
+            message = json.dumps(event.to_dict()).encode('utf-8')
+
+            logger.info(f"📤 Publishing event to topic [{topic}]: eventId={event.eventId}, type={event.eventType}")
+            logger.debug(f"Event payload: {message}")
+
             # Asynchronous produce
             p.produce(
-                topic, 
-                json.dumps(message).encode('utf-8'),
+                topic,
+                message,
                 callback=cls.delivery_report
             )
-            # Find time to flush() - in high throughput this should be managed differently,
-            # but for our daily batch, flushing immediately is fine to ensure delivery.
+
+            # Flush to ensure delivery
+            # In high throughput scenarios, this should be managed differently
             p.flush()
-            
+
         except Exception as e:
-            logger.error(f"Failed to publish event to {topic}: {e}")
+            logger.error(f"❌ Failed to publish event to {topic}: {e}")
             import traceback
             logger.error(traceback.format_exc())
 
+    @classmethod
+    def close(cls):
+        """Producer를 종료합니다"""
+        if cls._producer is not None:
+            cls._producer.flush()
+            logger.info("📡 Kafka producer closed")
+
+
+# ============================================================================
+# Legacy Support
+# ============================================================================
+
 def publish_event(event_type: str, payload: dict):
     """
-    Helper function to publish standardized events to the completion topic.
+    Legacy 호환성을 위한 헬퍼 함수
+
+    Deprecated: create_event()와 EventPublisher.publish()를 직접 사용하세요
     """
-    message = {
-        "type": event_type,
-        "timestamp": str(logging.Formatter('%(asctime)s').format(logging.LogRecord('', 0, '', 0, '', None, None))), # Simple timestamp
-        **payload
-    }
-    EventPublisher.publish(settings.KAFKA_TOPIC_ANALYSIS_COMPLETED, message)
+    from src.events.schema import create_event
+
+    logger.warning("⚠️ publish_event() is deprecated. Use EventPublisher.publish() instead.")
+
+    # Legacy event format을 BaseEvent로 변환
+    event = BaseEvent(
+        eventType=event_type,
+        payload=payload
+    )
+
+    EventPublisher.publish(settings.KAFKA_TOPIC_ANALYSIS_COMPLETED, event)

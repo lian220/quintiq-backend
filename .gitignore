@@ -64,3 +64,58 @@ build/
 *.class
 target/
 out/
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+*.hprof
+
+# Kotlin
+*.kotlin_module
+
+# IntelliJ IDEA
+*.iml
+*.ipr
+*.iws
+
+# Environment files
+.env.prod
+.env.dev
+.env.test
+*.env
+!.env.sample
+
+# Credentials & Secrets
+credentials/
+*.key
+*.pem
+*.p12
+*.jks
+*-key.json
+secrets/
+secret.*
+
+# Application configs with sensitive data
+application-local.yml
+application-dev.yml
+application-prod.yml
+application-secret.yml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log.*
+audit.log
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.bak
+*~.nib

@@ -1,3 +1,6 @@
+"""
+Quantiq Data Engine - Feature-based Architecture
+"""
 import logging
 import json
 import time
@@ -5,39 +8,57 @@ import threading
 from fastapi import FastAPI
 import uvicorn
 from confluent_kafka import Consumer, KafkaError
-from src.config import settings
-from src.db import MongoDB
-from src.services.data_collector import collect_economic_data
-from src.services.technical_analysis import TechnicalAnalysisService
-from src.services.sentiment_analysis import SentimentAnalysisService
-from src.events.publisher import publish_event
+from datetime import datetime
+from pytz import timezone
+
+from src.core.config import settings
+from src.core.database import MongoDB
+from src.features.economic_data.router import router as economic_router
+from src.features.economic_data.service import EconomicDataService
+from src.services.slack_notifier import SlackNotifier
+from src.core.kafka import KafkaEventPublisher
+
+KST = timezone('Asia/Seoul')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# FastAPI app for status/health checks
+# FastAPI app
 app = FastAPI(title="Quantiq Data Engine")
+
+# Include routers
+app.include_router(economic_router)
+
 
 @app.get("/")
 def read_root():
-    return {"status": "Quantiq Data Engine is running", "kafka_topic": "quantiq.analysis.request"}
+    return {
+        "status": "Quantiq Data Engine is running (Feature-based Architecture)",
+        "kafka_topics": [
+            "economic.data.update.request"
+        ],
+        "timestamp": datetime.now(KST).isoformat()
+    }
+
 
 @app.get("/health")
 def health_check():
-    return {"status": "alive"}
+    return {"status": "alive", "timestamp": datetime.now(KST).isoformat()}
+
 
 def run_api():
     logger.info("Starting Data Engine API server on port 8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+
 def main():
-    logger.info("Quantiq Data Engine Started")
-    
+    logger.info("Quantiq Data Engine Started (Feature-based Architecture)")
+
     # Start API server in a separate thread
     api_thread = threading.Thread(target=run_api, daemon=True)
     api_thread.start()
-    
+
     # 1. Start MongoDB connection
     db = MongoDB.get_db()
     if db is None:
@@ -47,20 +68,22 @@ def main():
     # 2. Setup Kafka Consumer
     conf = {
         'bootstrap.servers': settings.KAFKA_BOOTSTRAP_SERVERS,
-        'group.id': 'quantiq-data-engine-group',
+        'group.id': 'quantiq-data-engine-fresh',  # Fresh consumer group for clean start
         'auto.offset.reset': 'earliest'
     }
-    
-    # Wait for Kafka to be ready
-    time.sleep(10) 
-    
-    consumer = Consumer(conf)
-    topic = "quantiq.analysis.request"
-    consumer.subscribe([topic])
-    logger.info(f"Subscribed to {topic}")
 
-    technical_service = TechnicalAnalysisService()
-    sentiment_service = SentimentAnalysisService()
+    # Wait for Kafka to be ready
+    time.sleep(10)
+
+    consumer = Consumer(conf)
+
+    # 경제 데이터 업데이트 토픽 구독
+    topics = [settings.KAFKA_TOPIC_ECONOMIC_DATA_UPDATE_REQUEST]
+    consumer.subscribe(topics)
+    logger.info(f"Subscribed to topics: {topics}")
+
+    # Services 초기화
+    economic_service = EconomicDataService()
 
     try:
         while True:
@@ -76,32 +99,80 @@ def main():
                     continue
 
             try:
-                payload = json.loads(msg.value().decode('utf-8'))
-                logger.info(f"Received request: {payload}")
-                
-                request_type = payload.get("type", "ALL")
-                
-                if request_type in ["ALL", "TECHNICAL"]:
-                    logger.info("Starting Technical Analysis...")
-                    collect_economic_data()
-                    technical_service.analyze_stocks()
-                    publish_event("TECHNICAL_COMPLETED", {"status": "success"})
-                    
-                if request_type in ["ALL", "SENTIMENT"]:
-                    logger.info("Starting Sentiment Analysis...")
-                    sentiment_service.fetch_and_store_sentiment()
-                    publish_event("SENTIMENT_COMPLETED", {"status": "success"})
-                    
-                # Signal global completion
-                publish_event("ANALYSIS_COMPLETED", {"type": request_type, "status": "success"})
-                
+                topic_name = msg.topic()
+                message = json.loads(msg.value().decode('utf-8'))
+                logger.info(f"Received request from topic '{topic_name}': {message}")
+
+                # 경제 데이터 업데이트 요청 처리
+                if topic_name == settings.KAFKA_TOPIC_ECONOMIC_DATA_UPDATE_REQUEST:
+                    # payload 필드에서 실제 데이터 추출
+                    payload = message.get("payload", message)
+                    request_id = payload.get("requestId", "unknown")
+                    source = payload.get("source", "kafka")
+                    thread_ts = payload.get("threadTs")  # Kotlin에서 전달받은 스레드 타임스탬프
+
+                    logger.info("=" * 80)
+                    logger.info("경제 데이터 업데이트 Kafka 메시지 수신")
+                    logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Thread TS: {thread_ts}")
+                    logger.info("=" * 80)
+
+                    # 🔔 수집 시작 알림 (스레드 답글)
+                    SlackNotifier.notify_economic_data_collection_start(request_id, source, thread_ts)
+
+                    start_time = time.time()
+                    try:
+                        # Service 호출
+                        result = economic_service.collect_economic_data()
+                        elapsed_time = time.time() - start_time
+
+                        logger.info("✅ 경제 데이터 수집 완료")
+
+                        # 수집 결과 데이터 구성
+                        collection_summary = {
+                            "duration": f"{elapsed_time:.2f}초",
+                            "fred_collected": result.get("fred_collected", 0),
+                            "yahoo_collected": result.get("yahoo_collected", 0),
+                            "total_indicators": result.get("fred_collected", 0) + result.get("yahoo_collected", 0)
+                        }
+
+                        # 🔔 수집 완료 알림 (스레드 답글)
+                        SlackNotifier.notify_economic_data_collection_success(
+                            request_id,
+                            collection_summary,
+                            thread_ts
+                        )
+
+                        # 완료 이벤트 발행
+                        KafkaEventPublisher.publish("ECONOMIC_DATA_UPDATED", {
+                            "status": "success",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "duration": elapsed_time
+                        })
+                    except Exception as e:
+                        logger.error(f"❌ 경제 데이터 수집 실패: {e}")
+
+                        # 🔔 오류 알림 (스레드 답글)
+                        SlackNotifier.notify_economic_data_collection_error(request_id, str(e), thread_ts)
+
+                        # 오류 이벤트 발행
+                        KafkaEventPublisher.publish("ECONOMIC_DATA_UPDATE_FAILED", {
+                            "status": "failed",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "error": str(e)
+                        })
+                        raise
+
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
-                
+
     except KeyboardInterrupt:
         pass
     finally:
         consumer.close()
+
 
 if __name__ == "__main__":
     main()

@@ -4,8 +4,8 @@ import yfinance as yf
 from datetime import datetime
 import time
 import logging
-from src.config import settings
-from src.db import MongoDB
+from src.core.config import settings
+from src.core.database import MongoDB
 
 logger = logging.getLogger(__name__)
 

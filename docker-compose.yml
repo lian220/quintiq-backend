@@ -9,6 +9,13 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
     networks:
       - quantiq-network
 
@@ -27,6 +34,14 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms256M"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          memory: 512M
     networks:
       - quantiq-network
 
@@ -42,6 +57,13 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
       DYNAMIC_CONFIG_ENABLED: "true"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
     networks:
       - quantiq-network
 
@@ -62,6 +84,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          memory: 512M
+    shm_size: 256M
     networks:
       - quantiq-network
 
@@ -74,9 +104,16 @@ services:
       MONGO_INITDB_ROOT_USERNAME: quantiq_user
       MONGO_INITDB_ROOT_PASSWORD: quantiq_password
       MONGO_INITDB_DATABASE: stock_trading
-    command: mongod --auth
+    command: mongod --auth --wiredTigerCacheSizeGB 0.5
     volumes:
       - ./data/mongodb:/data/db
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          memory: 512M
     networks:
       - quantiq-network
 
@@ -92,12 +129,25 @@ services:
         condition: service_started
       mongodb:
         condition: service_started
+    env_file:
+      - .env.local
     environment:
-      MONGODB_URI: "mongodb://mongodb:27017"
+      TZ: "Asia/Seoul"
+      MONGODB_URI: "mongodb://quantiq_user:quantiq_password@mongodb:27017/stock_trading?authSource=admin"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
       FRED_API_KEY: ${FRED_API_KEY}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL_SCHEDULER}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_CHANNEL: "C0A1XASTLH2"
     volumes:
       - ./quantiq-data-engine:/app
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          memory: 512M
     networks:
       - quantiq-network
 
@@ -115,7 +165,10 @@ services:
         condition: service_started
       mongodb:
         condition: service_started
+    env_file:
+      - .env.local
     environment:
+      TZ: "Asia/Seoul"
       # PostgreSQL
       DB_HOST: postgresql
       DB_PORT: 5432
@@ -129,6 +182,10 @@ services:
       SPRING_DATA_MONGODB_URI: "mongodb://quantiq_user:quantiq_password@mongodb:27017/stock_trading?authSource=admin"
       # Kafka
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
+      # Slack
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL_TRADING}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_CHANNEL: "C0A1XASTLH2"
       # KIS (Korean Investment & Securities) - Temporary
       KIS_APP_KEY: "test_app_key"
       KIS_APP_SECRET: "test_app_secret"
@@ -136,6 +193,15 @@ services:
       DB_DUAL_WRITE: "true"
       DB_READ_SOURCE: "rdb"
       RUN_MIGRATION: "true"
+      # JVM Heap Settings
+      JAVA_OPTS: "-Xmx768m -Xms512m -XX:MaxMetaspaceSize=256m"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          memory: 768M
     networks:
       - quantiq-network
 
