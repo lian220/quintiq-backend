@@ -723,19 +723,20 @@ ANALYZE trading_configs;
 
 ## 📅 누락된 스케줄러 구현 TODO
 
-### ⚠️ 현재 구현 상태 (2025-01-31 확인)
+### ✅ 현재 구현 상태 (2026-02-01 업데이트)
 
-**✅ 구현 완료 (2/8)**
+**✅ 구현 완료 (8/9)**
 - [x] SCHEDULE_ECONOMIC_DATA_UPDATE_1 (06:05) - 경제 데이터 업데이트
-- [x] SCHEDULE_PARALLEL_ANALYSIS (23:05) - 병렬 분석
+- [x] SCHEDULE_ECONOMIC_DATA_UPDATE_2 (23:00) - 경제 데이터 재수집 + Vertex AI 예측
+- [x] SCHEDULE_PARALLEL_ANALYSIS (23:05) - 병렬 분석 (스켈레톤)
+- [x] SCHEDULE_COMBINED_ANALYSIS (23:45) - 통합 분석 (기술 70% + 감정 30%)
+- [x] SCHEDULE_AUTO_BUY (23:50) - 자동 매수 실행
+- [x] SCHEDULE_CLEANUP_ORDERS (06:30) - 주문 정리
+- [x] SCHEDULE_PORTFOLIO_PROFIT_REPORT (07:00) - 포트폴리오 수익 보고
+- [x] **SCHEDULE_AUTO_SELL (매 1분) - 자동 매도 실시간 모니터링 (신규)**
 
-**❌ 미구현 (6/8)**
-- [ ] SCHEDULE_ECONOMIC_DATA_UPDATE_2 (23:00) - 경제 데이터 재수집 + Vertex AI 예측 병렬 실행
-- [ ] SCHEDULE_VERTEX_AI_PREDICTION (23:00) - 레거시 (UPDATE_2와 병합 예정)
-- [ ] SCHEDULE_COMBINED_ANALYSIS (23:45) - 통합 분석
-- [ ] SCHEDULE_AUTO_BUY (23:50) - 자동 매수 실행
-- [ ] SCHEDULE_CLEANUP_ORDERS (06:30) - 주문 정리
-- [ ] SCHEDULE_PORTFOLIO_PROFIT_REPORT (07:00) - 포트폴리오 수익 보고
+**❌ 미구현 (1/9)**
+- [ ] SCHEDULE_VERTEX_AI_PREDICTION (23:00) - 레거시 (UPDATE_2와 병합됨, 삭제 예정)
 
 ### 🎯 구현 계획
 
@@ -782,16 +783,17 @@ quantiq-core/src/main/kotlin/com/quantiq/core/adapter/input/scheduler/
 
 ### 📊 우선순위
 
-**High Priority (자동 매매 핵심)**
-1. SCHEDULE_AUTO_BUY (23:50) - 자동 매수 실행
-2. SCHEDULE_ECONOMIC_DATA_UPDATE_2 (23:00) - 데이터 재수집
+**✅ High Priority (자동 매매 핵심) - 완료**
+1. ✅ SCHEDULE_AUTO_BUY (23:50) - 자동 매수 실행
+2. ✅ SCHEDULE_ECONOMIC_DATA_UPDATE_2 (23:00) - 데이터 재수집
+3. ✅ SCHEDULE_AUTO_SELL (매 1분) - 자동 매도 실시간 모니터링
 
-**Medium Priority (분석 및 보고)**
-3. SCHEDULE_COMBINED_ANALYSIS (23:45) - 통합 분석
-4. SCHEDULE_PORTFOLIO_PROFIT_REPORT (07:00) - 수익 보고
+**✅ Medium Priority (분석 및 보고) - 완료**
+4. ✅ SCHEDULE_COMBINED_ANALYSIS (23:45) - 통합 분석
+5. ✅ SCHEDULE_PORTFOLIO_PROFIT_REPORT (07:00) - 수익 보고
 
-**Low Priority (유지보수)**
-5. SCHEDULE_CLEANUP_ORDERS (06:30) - 주문 정리
+**✅ Low Priority (유지보수) - 완료**
+6. ✅ SCHEDULE_CLEANUP_ORDERS (06:30) - 주문 정리
 
 ### 🆕 추가 개선사항 (2026-02-01)
 
@@ -822,12 +824,24 @@ quantiq-core/src/main/kotlin/com/quantiq/core/adapter/input/scheduler/
 
 1. ✅ 현재 분석 기능 검증 (ANALYSIS_VERIFICATION_CHECKLIST.md)
 2. ✅ 마이그레이션 계획 검토 (이 문서)
-3. ✅ 누락된 스케줄러 확인 및 TODO 추가 (2025-01-31)
-4. 🚀 **다음: 누락된 스케줄러 구현 시작**
-5. 🚀 **그 다음: Day 1 환경 준비 시작**
+3. ✅ 누락된 스케줄러 확인 및 TODO 추가 (2026-01-31)
+4. ✅ **누락된 스케줄러 구현 완료 (2026-02-01)**
+   - ✅ 경제 데이터 재수집 (23:00)
+   - ✅ 통합 분석 (23:45)
+   - ✅ 자동 매수 (23:50)
+   - ✅ 주문 정리 (06:30)
+   - ✅ 포트폴리오 보고 (07:00)
+   - ✅ 자동 매도 모니터링 (매 1분) - 신규
+5. ✅ **뉴스 감정 분석 API 연동 완료 (2026-02-01)**
+   - ✅ Alpha Vantage NEWS_SENTIMENT API
+   - ✅ MongoDB 저장
+   - ✅ 통합 점수 계산 (기술 70% + 감정 30%)
+6. 🚀 **다음: ParallelAnalysisJob 구현 (23:05)**
+7. 🚀 **그 다음: AutoSell UseCase 구현 (매도 로직)**
+8. 🚀 **이후: MongoDB → PostgreSQL 마이그레이션 (Phase 1-3)**
 
 ---
 
-**마지막 업데이트:** 2025-01-31
-**버전:** 1.1
-**상태:** 스케줄러 TODO 추가 완료 ✅
+**마지막 업데이트:** 2026-02-01
+**버전:** 1.2
+**상태:** 스케줄러 구현 8/9 완료 ✅ (ParallelAnalysis만 남음)
