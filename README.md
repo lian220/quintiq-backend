@@ -1,468 +1,202 @@
-# Quantiq - Hybrid RDB/MongoDB Architecture
+# Quantiq - 알고리즘 트레이딩 플랫폼
 
-A modern stock trading analysis platform built with a hybrid data architecture: **PostgreSQL for operational data** and **MongoDB for analytical data**.
+PostgreSQL과 MongoDB를 활용한 하이브리드 아키텍처 기반의 주식 자동 매매 시스템입니다.
 
-## 📋 Project Overview
+## 📋 프로젝트 개요
 
-Quantiq separates concerns into two optimized database systems:
-- **PostgreSQL (RDB)**: User accounts, trading configurations, holdings, account balances - ACID-compliant transactional data
-- **MongoDB**: Stock analysis, recommendations, predictions, sentiment analysis, daily market data - flexible analytical data
+Quantiq는 거래 데이터와 분석 데이터를 분리하여 최적화된 성능을 제공합니다:
 
-This architecture enables fast transactional operations while supporting complex analytical queries and historical data accumulation.
+- **PostgreSQL (RDB)**: 사용자 계정, 거래 설정, 보유 종목, 계좌 잔고 등 트랜잭션 데이터
+- **MongoDB**: 주식 분석, 추천, 예측, 감정 분석, 일일 시장 데이터 등 분석 데이터
 
-## 🏗️ Architecture
+이 구조를 통해 빠른 거래 처리와 복잡한 분석 쿼리를 동시에 지원합니다.
+
+## 🏗️ 시스템 아키텍처
 
 ```
-quantiq
-├── PostgreSQL (Transactional)
-│   ├── Users & Accounts
-│   ├── Trading Configuration
-│   ├── Stock Holdings
-│   ├── Account Balances
-│   └── Trade Signals Executed
-│
-└── MongoDB (Analytical)
-    ├── Stocks (35 stocks)
-    ├── Recommendations (2,571)
-    ├── Predictions (781,923)
-    ├── Sentiment Data (2,328)
-    └── Daily Market Data (22,002 records)
+┌─────────────────────────────────────────────────────────┐
+│                     Quantiq Platform                     │
+├─────────────────────────────────────────────────────────┤
+│                                                           │
+│  ┌──────────────────┐         ┌──────────────────┐      │
+│  │  Quantiq Core    │         │  Data Engine     │      │
+│  │   (Kotlin)       │◄───────►│   (Python)       │      │
+│  │                  │         │                  │      │
+│  │  - REST API      │         │  - 데이터 수집    │      │
+│  │  - 자동 매매     │         │  - 분석 엔진      │      │
+│  │  - 스케줄러      │         │  - 예측 모델      │      │
+│  └────────┬─────────┘         └────────┬─────────┘      │
+│           │                            │                 │
+│           │                            │                 │
+│  ┌────────▼─────────┐         ┌────────▼─────────┐      │
+│  │   PostgreSQL     │         │     MongoDB      │      │
+│  │   (Port 5433)    │         │   (MongoDB Atlas)│      │
+│  │                  │         │                  │      │
+│  │  - users         │         │  - stocks        │      │
+│  │  - holdings      │         │  - predictions   │      │
+│  │  - balances      │         │  - sentiment     │      │
+│  │  - configs       │         │  - daily_data    │      │
+│  └──────────────────┘         └──────────────────┘      │
+│                                                           │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+### 주요 컴포넌트
 
-### One-Command Setup (Recommended)
+#### 1. Quantiq Core (Kotlin/Spring Boot)
+- **포트**: 10010
+- **역할**: REST API 제공, 자동 매매 실행, 스케줄링
+- **기술**: Spring Boot 3.4.1, Kotlin 2.1.0, JPA, Quartz
 
+#### 2. Data Engine (Python)
+- **포트**: 8000
+- **역할**: 데이터 수집, 분석, 예측 모델 실행
+- **기술**: FastAPI, pandas, scikit-learn
+
+#### 3. PostgreSQL (RDB)
+- **포트**: 5433
+- **역할**: 트랜잭션 데이터 저장
+- **데이터**: 사용자, 보유 종목, 계좌 잔고, 거래 설정
+
+#### 4. MongoDB (분석 DB)
+- **호스트**: MongoDB Atlas
+- **역할**: 분석 데이터 저장
+- **데이터**: 35개 종목, 78만+ 예측 데이터, 추천 및 감정 분석
+
+## 🛠️ 기술 스펙
+
+### Backend
+```yaml
+Quantiq Core:
+  언어: Kotlin 2.1.0
+  프레임워크: Spring Boot 3.4.1
+  빌드: Gradle 8.11.1
+  주요 라이브러리:
+    - Spring Data JPA
+    - Spring Web
+    - Quartz Scheduler
+    - PostgreSQL Driver
+    - MongoDB Driver
+
+Data Engine:
+  언어: Python 3.11+
+  프레임워크: FastAPI
+  주요 라이브러리:
+    - pandas
+    - numpy
+    - pymongo
+    - requests
+```
+
+### Database
+```yaml
+PostgreSQL:
+  버전: 15
+  포트: 5433
+  스키마: 4개 테이블 (users, holdings, balances, configs)
+
+MongoDB:
+  호스트: Atlas
+  컬렉션: 5개 (stocks, predictions, recommendations, sentiment, daily_data)
+```
+
+### Infrastructure
+```yaml
+Docker:
+  - quantiq-postgres (PostgreSQL 15)
+  - quantiq-core (Spring Boot)
+  - quantiq-data-engine (FastAPI)
+
+환경 변수:
+  - .env: 로컬 개발 환경
+  - .env.prod: 프로덕션 환경
+```
+
+## 🚀 빠른 시작
+
+### 1. 환경 설정
 ```bash
-cd /Users/imdoyeong/Desktop/workSpace/quantiq
+# 저장소 클론
+git clone <repository-url>
+cd quantiq
+
+# Docker 서비스 시작
+docker-compose up -d
+
+# 초기 데이터 설정
 ./scripts/init_quantiq.sh
 ```
 
-This single command automatically:
-1. ✅ Cleans PostgreSQL database
-2. ✅ Sets up Python environment
-3. ✅ Loads environment variables
-4. ✅ Initializes all data from stock-trading source
-5. ✅ Validates the setup
-
-### Manual Setup (Step-by-Step)
-
+### 2. 서비스 접근
 ```bash
-# 1. Activate virtual environment
-source scripts/venv/bin/activate
+# Quantiq Core API
+curl http://localhost:10010/api/users/lian
 
-# 2. Load environment variables
-export $(cat .env | xargs)
-
-# 3. Setup initial data
-python3 scripts/setup_initial_data.py
-
-# 4. Validate migration
-python3 scripts/validate_migration.py
+# Data Engine API
+curl http://localhost:8000/health
 ```
 
-## 📊 Current Data State
-
-After migration from stock-trading system:
-
-### PostgreSQL (RDB)
-- **Users**: 1 (lian@lian.dy220@gmail.com)
-- **Trading Configuration**: 1 active config
-- **Stock Holdings**: 20 positions
-- **Account Balance**: $1,136.72 USD
-
-### MongoDB (Analytics)
-- **Stocks**: 35 companies
-- **Stock Recommendations**: 2,571 records
-- **Price Predictions**: 781,923 records
-- **Sentiment Analysis**: 2,328 records
-- **Daily Market Data**: 22,002 records
-
-## 📁 File Structure
-
-```
-scripts/
-├── 🚀 init_quantiq.sh              ⭐ Primary initialization script
-│   ├─ Checks prerequisites
-│   ├─ Cleans PostgreSQL
-│   ├─ Sets up Python environment
-│   ├─ Runs setup_initial_data.py
-│   └─ Validates setup
-│
-├── 🐍 setup_initial_data.py        Core data migration logic
-│   ├─ analyze_portfolio()         Analyzes stock-trading MongoDB
-│   └─ setup_quantiq_data()        Writes to quantiq PostgreSQL
-│
-├── 🐍 validate_migration.py        Data integrity validation
-│   ├─ Checks user data
-│   ├─ Verifies holdings
-│   ├─ Validates account balance
-│   └─ Confirms MongoDB connection
-│
-├── 🐍 analyze_current_state.py     Portfolio analysis tool
-│   ├─ Portfolio overview
-│   ├─ Holdings breakdown
-│   ├─ Trading history
-│   └─ SQL generation
-│
-├── 🐍 migrate_data.py              MongoDB analysis data migration
-│   └─ Handles large analytical dataset transfers
-│
-├── 📚 README.md                    Quick start guide
-├── 📚 MIGRATION_GUIDE.md           Detailed migration documentation
-├── 📚 requirements.txt             Python dependencies
-│
-├── 🔄 venv/                        Python virtual environment
-│   └─ auto-created on first run
-│
-└── 📋 run_migration.sh             Legacy: MongoDB analysis data import
-    └─ (migration already complete)
-```
-
-## 🔧 Configuration
-
-### Environment Variables (.env)
-
+### 3. 데이터베이스 접근
 ```bash
-# PostgreSQL (RDB)
-DB_HOST=localhost
-DB_PORT=5433
-DB_NAME=quantiq
-DB_USER=quantiq_user
-DB_PASSWORD=quantiq_password
-
-# MongoDB (Analytics)
-MONGO_URL=mongodb+srv://cluster-test.2dkjwjs.mongodb.net
-MONGO_USER=test
-MONGO_PASSWORD=[password]
-```
-
-### Database Connection Details
-
-**PostgreSQL Container**:
-```bash
-docker exec quantiq-postgres psql -U quantiq_user -d quantiq
-```
-
-**MongoDB Atlas**:
-```bash
-mongosh -u quantiq_user -p quantiq_password
-```
-
-## 📚 Database Schema
-
-### PostgreSQL Tables
-
-#### users
-```sql
-- id (PRIMARY KEY)
-- user_id (VARCHAR UNIQUE)
-- name (VARCHAR)
-- email (VARCHAR)
-- password_hash (VARCHAR)
-- status (VARCHAR) - ACTIVE/INACTIVE
-- created_at (TIMESTAMP)
-```
-
-#### trading_configs
-```sql
-- id (PRIMARY KEY)
-- user_id (FOREIGN KEY)
-- enabled (BOOLEAN)
-- auto_trading_enabled (BOOLEAN)
-- min_composite_score (DECIMAL)
-- max_stocks_to_buy (INTEGER)
-- stop_loss_percent (DECIMAL)
-- take_profit_percent (DECIMAL)
-```
-
-#### stock_holdings
-```sql
-- id (PRIMARY KEY)
-- user_id (FOREIGN KEY)
-- ticker (VARCHAR)
-- quantity (INTEGER)
-- average_price (DECIMAL)
-- total_cost (DECIMAL)
-- current_value (DECIMAL)
-```
-
-#### account_balances
-```sql
-- id (PRIMARY KEY)
-- user_id (FOREIGN KEY)
-- cash (DECIMAL)
-- total_value (DECIMAL)
-- locked_cash (DECIMAL)
-- version (INTEGER)
-```
-
-### MongoDB Collections
-
-#### stocks
-```javascript
-{
-  "_id": ObjectId,
-  "ticker": "AAPL",
-  "company_name": "Apple Inc.",
-  "sector": "Technology",
-  ...
-}
-```
-
-#### recommendations
-```javascript
-{
-  "_id": ObjectId,
-  "ticker": "AAPL",
-  "score": 4.5,
-  "analysis_date": ISODate,
-  ...
-}
-```
-
-#### predictions
-```javascript
-{
-  "_id": ObjectId,
-  "ticker": "AAPL",
-  "predicted_price": 175.50,
-  "confidence": 0.85,
-  ...
-}
-```
-
-## 🧪 Validation & Testing
-
-### Run Validation
-```bash
-python3 scripts/validate_migration.py
-```
-
-Validates:
-- ✅ PostgreSQL connection and data integrity
-- ✅ MongoDB connection and analytical data
-- ✅ User account setup
-- ✅ Holdings accuracy
-- ✅ Account balance consistency
-
-### Check Current State
-```bash
-python3 scripts/analyze_current_state.py
-```
-
-Displays:
-- Current holdings and average prices
-- Account balance information
-- Trading history summary
-- SQL statements for reference
-
-## 🐛 Troubleshooting
-
-### PostgreSQL Connection Fails
-```bash
-# Check if container is running
-docker-compose ps
-
-# Start services
-docker-compose up -d
-
-# Verify connection
-docker exec quantiq-postgres psql -U quantiq_user -d quantiq -c "SELECT COUNT(*) FROM users;"
-```
-
-### MongoDB Connection Fails
-```bash
-# Check connection details in .env
-# Verify credentials in MongoDB Atlas console
-# Test connection manually
-mongosh -u quantiq_user -p quantiq_password
-```
-
-### Data Integrity Issues
-```bash
-# Full system reset
-docker-compose down
-docker volume rm quantiq_postgres_data  # if needed
-docker-compose up -d
-./scripts/init_quantiq.sh
-```
-
-### Python Environment Issues
-```bash
-# Recreate virtual environment
-rm -rf scripts/venv
-python3 -m venv scripts/venv
-source scripts/venv/bin/activate
-pip install -r scripts/requirements.txt
-```
-
-## 🔄 Migration Process
-
-### What Was Migrated
-
-1. **User Account** (`lian` from stock-trading)
-   - Email: lian.dy220@gmail.com
-   - Status: Active
-   - Trading configuration imported
-
-2. **Portfolio State** (from trading_logs analysis)
-   - Calculated holdings from buy/sell history
-   - Current cash balance
-   - Total asset value
-   - Average price per holding
-
-3. **Analytical Data** (MongoDB collection)
-   - 35 stocks with comprehensive data
-   - 2,571 buy/sell recommendations
-   - 781,923 price predictions
-   - 2,328 sentiment analysis records
-   - 22,002 daily market data records
-
-### Why This Approach?
-
-**PostgreSQL for RDB**:
-- ✅ ACID compliance for financial transactions
-- ✅ Strong data integrity with foreign keys
-- ✅ Fast user queries and updates
-- ✅ Support for complex JOINs
-- ✅ Ready for real-time trading execution
-
-**MongoDB for Analytics**:
-- ✅ Flexible document structure for varied analysis
-- ✅ Scalable storage for large historical datasets
-- ✅ Fast aggregation pipelines
-- ✅ Easy to add new analysis fields
-- ✅ Supports time-series data patterns
-
-## 🚀 Next Steps
-
-### Immediate Development
-1. **API Development**
-   ```bash
-   docker-compose up quantiq-core
-   # Access API at http://localhost:10010
-   ```
-
-2. **Test API Endpoints**
-   ```bash
-   curl http://localhost:10010/api/users/lian
-   curl http://localhost:10010/api/portfolio/lian
-   curl http://localhost:10010/api/holdings/lian
-   ```
-
-3. **MongoDB Data Queries**
-   ```javascript
-   // Check available stocks
-   db.stocks.find().limit(5)
-
-   // Get recommendations for a ticker
-   db.recommendations.find({ticker: "AAPL"})
-
-   // Get price predictions
-   db.predictions.find({ticker: "AAPL"}).sort({prediction_date: -1})
-   ```
-
-### Planned Features
-- [ ] Real-time trading execution integration
-- [ ] Portfolio performance analytics dashboard
-- [ ] Alert system for trading signals
-- [ ] Historical analysis reporting
-- [ ] Machine learning model integration
-
-### Monitoring
-- Database performance metrics
-- API response times
-- Data sync validation
-- Alert trigger accuracy
-
-## 📖 Documentation
-
-- **[Quick Start](./scripts/README.md)** - Script usage and commands
-- **[Migration Guide](./scripts/MIGRATION_GUIDE.md)** - Detailed migration documentation
-- **[Requirements](./scripts/requirements.txt)** - Python dependencies
-
-## 🔐 Security Notes
-
-- PostgreSQL password: `quantiq_password` (change in production)
-- MongoDB credentials stored in .env (never commit)
-- API tokens: implement before production
-- Consider SSL/TLS for all database connections
-
-## 📞 Support
-
-### Common Issues
-
-**Q: How do I reset the database?**
-```bash
-./scripts/init_quantiq.sh  # Automatically cleans and reinitializes
-```
-
-**Q: How do I check if data loaded correctly?**
-```bash
-python3 scripts/validate_migration.py
-python3 scripts/analyze_current_state.py
-```
-
-**Q: Can I modify holdings manually?**
-```sql
--- Connect to PostgreSQL
+# PostgreSQL
 docker exec -it quantiq-postgres psql -U quantiq_user -d quantiq
 
--- Update holdings (example)
-UPDATE stock_holdings SET quantity = 100 WHERE ticker = 'AAPL';
-```
-
-**Q: How do I add more stocks to MongoDB?**
-```javascript
-// Connect to MongoDB
+# MongoDB (Atlas)
 mongosh -u quantiq_user -p quantiq_password
-
-// Insert stock data
-db.stocks.insertOne({
-  "ticker": "MSFT",
-  "company_name": "Microsoft",
-  ...
-})
 ```
 
-## 📝 Version History
+## 📚 상세 문서
 
-- **v1.0** (Current)
-  - ✅ PostgreSQL RDB setup with user, holdings, config data
-  - ✅ MongoDB analytics data migration (35 stocks, 781k+ records)
-  - ✅ Automated initialization script (init_quantiq.sh)
-  - ✅ Data validation and analysis tools
-  - ✅ Complete documentation
+프로젝트의 모든 문서는 `docs/` 폴더에 체계적으로 정리되어 있습니다.
 
-## 🎯 System Status
+### 시작하기
+- **[TODO 및 개발 계획](./docs/todo/)** ⭐ - 우선순위별 작업 계획 확인
+- **[빠른 시작 가이드](./docs/setup/QUICK_START_RDB.md)** - 빠른 환경 설정
+- **[설정 가이드](./docs/setup/SETUP_GUIDE.md)** - 상세 환경 설정
 
-```
-┌─────────────────────────────────────┐
-│ ✅ PostgreSQL Initialized           │
-│   - 1 User (lian)                  │
-│   - 20 Stock Holdings              │
-│   - $1,136.72 Balance              │
-├─────────────────────────────────────┤
-│ ✅ MongoDB Analytical Data Ready    │
-│   - 35 Stocks                      │
-│   - 2,571 Recommendations          │
-│   - 781,923 Predictions            │
-│   - 2,328 Sentiment Records        │
-│   - 22,002 Daily Data              │
-├─────────────────────────────────────┤
-│ ✅ Core Infrastructure Ready        │
-│   - Docker Services Running         │
-│   - Environment Configured          │
-│   - Validation Passing              │
-├─────────────────────────────────────┤
-│ 🔄 Ready for: quantiq-core Service │
-│ 🔄 Ready for: API Development      │
-└─────────────────────────────────────┘
-```
+### 아키텍처 및 설계
+- **[시스템 아키텍처](./docs/architecture/ARCHITECTURE.md)** - 전체 시스템 구조
+- **[데이터베이스 전략](./docs/migration/DATABASE_STRATEGY.md)** - DB 설계 전략
+- **[마이그레이션 계획](./docs/migration/RDB_MIGRATION_PLAN.md)** - RDB 마이그레이션
+
+### 개발 가이드
+- **[프로젝트 개요](./docs/guidelines/PROJECT_OVERVIEW.md)** - 프로젝트 소개
+- **[코드 스타일](./docs/guidelines/CODE_STYLE.md)** - 코드 작성 규칙
+- **[주요 커맨드](./docs/setup/COMMANDS.md)** - CLI 명령어
+
+### 기능 명세
+- **[기능 로드맵](./docs/todo/기능_로드맵.md)** - 전체 기능 계획
+- **[Phase 1-3 스펙](./docs/todo/)** - 단계별 구현 스펙
+- **[분석 아키텍처](./docs/features/ANALYSIS_ARCHITECTURE.md)** - 분석 시스템
+
+## 🔍 현재 상태
+
+### PostgreSQL (운영 DB)
+- 사용자: 1명 (lian@lian.dy220@gmail.com)
+- 보유 종목: 20개
+- 계좌 잔고: $1,136.72 USD
+- 거래 설정: 1개 (활성화)
+
+### MongoDB (분석 DB)
+- 종목 데이터: 35개
+- 추천 데이터: 2,571건
+- 가격 예측: 781,923건
+- 감정 분석: 2,328건
+- 일일 시장 데이터: 22,002건
+
+## 📞 문의 및 지원
+
+### 문제 해결
+- **[로컬 테스트 가이드](./docs/setup/LOCAL_TEST_GUIDE.md)** - 테스트 방법
+- **[Slack 설정](./docs/setup/SLACK_SETUP_GUIDE.md)** - 알림 설정
+
+### 개발 진행 상황
+- **Phase 1**: ✅ 기본 인프라 구축 완료
+- **Phase 2**: 🔄 데이터 엔진 통합 진행 중
+- **Phase 3**: 🔜 자동 매매 시스템 예정
 
 ---
 
-**Last Updated**: 2025-01-29
-**Status**: ✅ Production Ready
-**Maintainer**: Quantiq Development Team
+**마지막 업데이트**: 2026-01-31
+**상태**: ✅ Phase 1 완료, Phase 2 진행 중
+**관리자**: Quantiq Development Team
