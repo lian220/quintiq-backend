@@ -20,4 +20,20 @@ class SlackNotificationAdapter(
     override fun notifyEconomicDataCollectionError(requestId: String, error: String) {
         slackApiClient.notifyEconomicDataCollectionError(requestId, error)
     }
+
+    override fun notifyTechnicalAnalysisRequest(requestId: String): String? {
+        return slackApiClient.notifyTechnicalAnalysisRequest(requestId)
+    }
+
+    override fun notifySentimentAnalysisRequest(requestId: String): String? {
+        return slackApiClient.notifySentimentAnalysisRequest(requestId)
+    }
+
+    override fun notifyCombinedAnalysisRequest(requestId: String): String? {
+        return slackApiClient.notifyCombinedAnalysisRequest(requestId)
+    }
+
+    override fun notifyAnalysisError(requestId: String, analysisType: String, error: String) {
+        slackApiClient.notifyAnalysisError(requestId, analysisType, error)
+    }
 }

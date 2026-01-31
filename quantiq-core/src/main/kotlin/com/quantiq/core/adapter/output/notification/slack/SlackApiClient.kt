@@ -198,6 +198,212 @@ class SlackApiClient(
     }
 
     /**
+     * 기술적 분석 요청 알림 (스레드 루트 메시지)
+     *
+     * @return Slack 스레드 타임스탬프 (답글용)
+     */
+    fun notifyTechnicalAnalysisRequest(requestId: String): String? {
+        if (slackBotToken.isBlank()) {
+            logger.warn("⚠️ Slack Bot Token 없음 - Webhook으로 fallback")
+            notifyViaWebhook("📊 기술적 분석 요청", requestId, "기술적 지표 분석")
+            return null
+        }
+
+        try {
+            val message = SlackApiMessage(
+                channel = slackChannel,
+                text = "📊 기술적 분석 요청",
+                attachments = listOf(
+                    SlackAttachment(
+                        color = "0099cc",
+                        title = "기술적 지표 분석 시작",
+                        text = "SMA, RSI, MACD 기술적 지표 분석이 요청되었습니다.",
+                        fields = listOf(
+                            SlackField("Request ID", requestId, true),
+                            SlackField("Timestamp", getCurrentTimeKST(), true),
+                            SlackField("Source", "Quartz Scheduler", true),
+                            SlackField("Status", "🔄 Processing", true)
+                        )
+                    )
+                )
+            )
+
+            val response = sendToSlackApi(message)
+            val threadTs = response?.ts
+
+            if (threadTs != null) {
+                logger.info("✅ Slack 스레드 루트 생성: requestId=$requestId, threadTs=$threadTs")
+            } else {
+                logger.warn("⚠️ Slack 메시지 발송 성공하지만 threadTs 없음")
+            }
+
+            return threadTs
+        } catch (e: Exception) {
+            logger.error("❌ Slack API 알림 발송 실패", e)
+            return null
+        }
+    }
+
+    /**
+     * 뉴스 감정 분석 요청 알림 (스레드 루트 메시지)
+     *
+     * @return Slack 스레드 타임스탬프 (답글용)
+     */
+    fun notifySentimentAnalysisRequest(requestId: String): String? {
+        if (slackBotToken.isBlank()) {
+            logger.warn("⚠️ Slack Bot Token 없음 - Webhook으로 fallback")
+            notifyViaWebhook("📰 뉴스 감정 분석 요청", requestId, "뉴스 감정 분석")
+            return null
+        }
+
+        try {
+            val message = SlackApiMessage(
+                channel = slackChannel,
+                text = "📰 뉴스 감정 분석 요청",
+                attachments = listOf(
+                    SlackAttachment(
+                        color = "ffa500",
+                        title = "뉴스 감정 분석 시작",
+                        text = "Alpha Vantage NEWS_SENTIMENT API를 통한 감정 분석이 요청되었습니다.",
+                        fields = listOf(
+                            SlackField("Request ID", requestId, true),
+                            SlackField("Timestamp", getCurrentTimeKST(), true),
+                            SlackField("Source", "Quartz Scheduler", true),
+                            SlackField("Status", "🔄 Processing", true)
+                        )
+                    )
+                )
+            )
+
+            val response = sendToSlackApi(message)
+            val threadTs = response?.ts
+
+            if (threadTs != null) {
+                logger.info("✅ Slack 스레드 루트 생성: requestId=$requestId, threadTs=$threadTs")
+            } else {
+                logger.warn("⚠️ Slack 메시지 발송 성공하지만 threadTs 없음")
+            }
+
+            return threadTs
+        } catch (e: Exception) {
+            logger.error("❌ Slack API 알림 발송 실패", e)
+            return null
+        }
+    }
+
+    /**
+     * 통합 분석 요청 알림 (스레드 루트 메시지)
+     *
+     * @return Slack 스레드 타임스탬프 (답글용)
+     */
+    fun notifyCombinedAnalysisRequest(requestId: String): String? {
+        if (slackBotToken.isBlank()) {
+            logger.warn("⚠️ Slack Bot Token 없음 - Webhook으로 fallback")
+            notifyViaWebhook("🧩 통합 분석 요청", requestId, "통합 분석")
+            return null
+        }
+
+        try {
+            val message = SlackApiMessage(
+                channel = slackChannel,
+                text = "🧩 통합 분석 요청",
+                attachments = listOf(
+                    SlackAttachment(
+                        color = "9c27b0",
+                        title = "통합 분석 시작",
+                        text = "기술적 분석 + 감정 분석 + 통합 점수 계산이 요청되었습니다.",
+                        fields = listOf(
+                            SlackField("Request ID", requestId, true),
+                            SlackField("Timestamp", getCurrentTimeKST(), true),
+                            SlackField("Source", "Quartz Scheduler", true),
+                            SlackField("Status", "🔄 Processing", true)
+                        )
+                    )
+                )
+            )
+
+            val response = sendToSlackApi(message)
+            val threadTs = response?.ts
+
+            if (threadTs != null) {
+                logger.info("✅ Slack 스레드 루트 생성: requestId=$requestId, threadTs=$threadTs")
+            } else {
+                logger.warn("⚠️ Slack 메시지 발송 성공하지만 threadTs 없음")
+            }
+
+            return threadTs
+        } catch (e: Exception) {
+            logger.error("❌ Slack API 알림 발송 실패", e)
+            return null
+        }
+    }
+
+    /**
+     * 분석 오류 알림
+     */
+    fun notifyAnalysisError(requestId: String, analysisType: String, error: String) {
+        if (slackWebhookUrl.isBlank()) return
+
+        try {
+            val message = SlackMessage(
+                text = "⚠️ $analysisType 분석 오류",
+                attachments = listOf(
+                    SlackAttachment(
+                        color = "dc3545",
+                        title = "$analysisType 분석 실패",
+                        text = "분석 중 오류가 발생했습니다.",
+                        fields = listOf(
+                            SlackField("Request ID", requestId, true),
+                            SlackField("Analysis Type", analysisType, true),
+                            SlackField("Error", error, false),
+                            SlackField("Timestamp", getCurrentTimeKST(), true)
+                        )
+                    )
+                )
+            )
+
+            sendToSlackWebhook(message)
+            logger.info("⚠️ 오류 알림 발송 완료")
+        } catch (e: Exception) {
+            logger.error("❌ 오류 알림 발송 실패", e)
+        }
+    }
+
+    /**
+     * Webhook 일반 알림 (fallback)
+     */
+    private fun notifyViaWebhook(title: String, requestId: String, description: String) {
+        if (slackWebhookUrl.isBlank()) {
+            logger.debug("Slack webhook URL not configured, skipping notification")
+            return
+        }
+
+        try {
+            val message = SlackMessage(
+                text = title,
+                attachments = listOf(
+                    SlackAttachment(
+                        color = "0099cc",
+                        title = description,
+                        text = "분석 요청이 발행되었습니다.",
+                        fields = listOf(
+                            SlackField("Request ID", requestId, true),
+                            SlackField("Timestamp", getCurrentTimeKST(), true),
+                            SlackField("Source", "Quartz Scheduler", true),
+                            SlackField("Status", "🔄 Processing", true)
+                        )
+                    )
+                )
+            )
+
+            sendToSlackWebhook(message)
+            logger.info("✅ Slack 알림 발송 완료 (Webhook): $requestId")
+        } catch (e: Exception) {
+            logger.error("❌ Slack Webhook 알림 발송 실패", e)
+        }
+    }
+
+    /**
      * Slack Webhook으로 메시지 전송
      */
     private fun sendToSlackWebhook(message: SlackMessage) {

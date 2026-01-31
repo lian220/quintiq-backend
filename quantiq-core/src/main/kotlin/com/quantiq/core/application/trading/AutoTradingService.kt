@@ -2,10 +2,11 @@ package com.quantiq.core.application.trading
 
 import com.quantiq.core.adapter.output.persistence.jpa.*
 import com.quantiq.core.adapter.output.persistence.mongodb.StockRecommendationRepository
-import com.quantiq.core.adapter.output.persistence.mongodb.jpa.TradingConfigJpaRepository
-import com.quantiq.core.adapter.output.persistence.mongodb.jpa.TradeJpaRepository
-import com.quantiq.core.adapter.output.persistence.mongodb.jpa.TradeSignalExecutedJpaRepository
-import com.quantiq.core.adapter.output.persistence.mongodb.jpa.UserJpaRepository
+import com.quantiq.core.adapter.output.persistence.jpa.TradingConfigJpaRepository
+import com.quantiq.core.adapter.output.persistence.jpa.TradeJpaRepository
+import com.quantiq.core.adapter.output.persistence.jpa.TradeSignalExecutedJpaRepository
+import com.quantiq.core.adapter.output.persistence.jpa.UserJpaRepository
+import com.quantiq.core.application.balance.BalanceService
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -103,7 +104,7 @@ class AutoTradingService(
                         }
 
                         // 주문 금액 계산
-                        val orderAmount = minOf(maxAmountPerStock, cashRemaining)
+                        val orderAmount = maxAmountPerStock.min(cashRemaining)
                         if (orderAmount < price) {
                             logger.info("⚠️ Insufficient funds for $ticker (need $price, have $orderAmount)")
                             recordSignalExecution(user, recommendationId, ticker, recommendation.compositeScore ?: 0.0, ExecutionDecision.SKIPPED, "Insufficient funds", null)

@@ -16,4 +16,27 @@ interface NotificationSender {
      * 경제 데이터 수집 오류 알림
      */
     fun notifyEconomicDataCollectionError(requestId: String, error: String)
+
+    /**
+     * 기술적 분석 요청 알림 (스레드 루트 메시지)
+     * @return Slack 스레드 타임스탬프 (threadTs)
+     */
+    fun notifyTechnicalAnalysisRequest(requestId: String): String?
+
+    /**
+     * 감정 분석 요청 알림 (스레드 루트 메시지)
+     * @return Slack 스레드 타임스탬프 (threadTs)
+     */
+    fun notifySentimentAnalysisRequest(requestId: String): String?
+
+    /**
+     * 통합 분석 요청 알림 (스레드 루트 메시지)
+     * @return Slack 스레드 타임스탬프 (threadTs)
+     */
+    fun notifyCombinedAnalysisRequest(requestId: String): String?
+
+    /**
+     * 분석 오류 알림
+     */
+    fun notifyAnalysisError(requestId: String, analysisType: String, error: String)
 }

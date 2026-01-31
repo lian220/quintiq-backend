@@ -1,5 +1,6 @@
 package com.quantiq.core.domain.economic.port.output
 
+import com.quantiq.core.domain.model.AnalysisRequest
 import com.quantiq.core.domain.model.EconomicDataUpdateRequest
 
 /**
@@ -15,5 +16,15 @@ interface MessagePublisher {
     fun publishEconomicDataUpdateRequest(
         topic: String,
         request: EconomicDataUpdateRequest
+    )
+
+    /**
+     * 분석 요청 메시지 발행
+     * @param topic 메시지 토픽
+     * @param request 분석 요청
+     */
+    fun publishAnalysisRequest(
+        topic: String,
+        request: AnalysisRequest
     )
 }
