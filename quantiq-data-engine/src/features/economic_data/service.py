@@ -28,8 +28,9 @@ class EconomicDataService:
             logger.info("경제 데이터 수집 시작")
 
             # 날짜 범위 설정
+            # GDP는 분기별, CPI/실업률은 월별이므로 90일 조회
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date - timedelta(days=90)
             start_date_str = start_date.strftime("%Y-%m-%d")
             end_date_str = end_date.strftime("%Y-%m-%d")
 

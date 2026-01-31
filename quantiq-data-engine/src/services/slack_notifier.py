@@ -291,3 +291,27 @@ class SlackNotifier:
             }
         ]
         SlackNotifier._post_message(text, attachments)
+
+    @staticmethod
+    def send_thread_message(text: str, thread_ts: str):
+        """
+        간단한 스레드 답글 메시지 발송
+
+        Args:
+            text: 메시지 텍스트
+            thread_ts: 스레드 타임스탬프
+        """
+        if not thread_ts:
+            logger.warning("⚠️ thread_ts가 없어 스레드 답글을 보낼 수 없습니다")
+            return
+
+        attachments = [
+            {
+                "color": "0099cc",
+                "text": text,
+                "footer": "Quantiq Data Engine",
+                "ts": int(datetime.now(KST).timestamp())
+            }
+        ]
+
+        SlackNotifier._post_message("", attachments, thread_ts=thread_ts)

@@ -15,6 +15,7 @@ from src.core.config import settings
 from src.core.database import MongoDB
 from src.features.economic_data.router import router as economic_router
 from src.features.economic_data.service import EconomicDataService
+from src.services.recommendation_service import RecommendationService
 from src.services.slack_notifier import SlackNotifier
 from src.core.kafka import KafkaEventPublisher
 
@@ -77,13 +78,19 @@ def main():
 
     consumer = Consumer(conf)
 
-    # 경제 데이터 업데이트 토픽 구독
-    topics = [settings.KAFKA_TOPIC_ECONOMIC_DATA_UPDATE_REQUEST]
+    # 토픽 구독 (경제 데이터 + 분석 요청)
+    topics = [
+        settings.KAFKA_TOPIC_ECONOMIC_DATA_UPDATE_REQUEST,
+        "analysis.technical.request",
+        "analysis.sentiment.request",
+        "analysis.combined.request"
+    ]
     consumer.subscribe(topics)
     logger.info(f"Subscribed to topics: {topics}")
 
     # Services 초기화
     economic_service = EconomicDataService()
+    recommendation_service = RecommendationService()
 
     try:
         while True:
@@ -164,6 +171,113 @@ def main():
                             "error": str(e)
                         })
                         raise
+
+                # 기술적 분석 요청 처리
+                elif topic_name == "analysis.technical.request":
+                    payload = message.get("payload", message)
+                    request_id = payload.get("requestId", "unknown")
+                    thread_ts = payload.get("threadTs")  # Kotlin에서 전달받은 스레드 타임스탬프
+
+                    logger.info("=" * 80)
+                    logger.info("기술적 분석 요청 Kafka 메시지 수신")
+                    logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Thread TS: {thread_ts}")
+                    logger.info("=" * 80)
+
+                    start_time = time.time()
+                    try:
+                        # Service 호출
+                        result = recommendation_service.run_technical_analysis(request_id, thread_ts)
+                        elapsed_time = time.time() - start_time
+
+                        logger.info("✅ 기술적 분석 완료")
+
+                        # 완료 이벤트 발행
+                        KafkaEventPublisher.publish("ANALYSIS_TECHNICAL_COMPLETED", {
+                            "status": "success",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "duration": elapsed_time,
+                            "result": result
+                        })
+                    except Exception as e:
+                        logger.error(f"❌ 기술적 분석 실패: {e}")
+                        KafkaEventPublisher.publish("ANALYSIS_TECHNICAL_FAILED", {
+                            "status": "failed",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "error": str(e)
+                        })
+
+                # 감정 분석 요청 처리
+                elif topic_name == "analysis.sentiment.request":
+                    payload = message.get("payload", message)
+                    request_id = payload.get("requestId", "unknown")
+                    thread_ts = payload.get("threadTs")
+
+                    logger.info("=" * 80)
+                    logger.info("뉴스 감정 분석 요청 Kafka 메시지 수신")
+                    logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Thread TS: {thread_ts}")
+                    logger.info("=" * 80)
+
+                    start_time = time.time()
+                    try:
+                        result = recommendation_service.run_sentiment_analysis(request_id, thread_ts)
+                        elapsed_time = time.time() - start_time
+
+                        logger.info("✅ 뉴스 감정 분석 완료")
+
+                        KafkaEventPublisher.publish("ANALYSIS_SENTIMENT_COMPLETED", {
+                            "status": "success",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "duration": elapsed_time,
+                            "result": result
+                        })
+                    except Exception as e:
+                        logger.error(f"❌ 뉴스 감정 분석 실패: {e}")
+                        KafkaEventPublisher.publish("ANALYSIS_SENTIMENT_FAILED", {
+                            "status": "failed",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "error": str(e)
+                        })
+
+                # 통합 분석 요청 처리
+                elif topic_name == "analysis.combined.request":
+                    payload = message.get("payload", message)
+                    request_id = payload.get("requestId", "unknown")
+                    thread_ts = payload.get("threadTs")
+
+                    logger.info("=" * 80)
+                    logger.info("통합 분석 요청 Kafka 메시지 수신")
+                    logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Thread TS: {thread_ts}")
+                    logger.info("=" * 80)
+
+                    start_time = time.time()
+                    try:
+                        result = recommendation_service.run_combined_analysis(request_id, thread_ts)
+                        elapsed_time = time.time() - start_time
+
+                        logger.info("✅ 통합 분석 완료")
+
+                        KafkaEventPublisher.publish("ANALYSIS_COMPLETED", {
+                            "status": "success",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "duration": elapsed_time,
+                            "result": result
+                        })
+                    except Exception as e:
+                        logger.error(f"❌ 통합 분석 실패: {e}")
+                        KafkaEventPublisher.publish("ANALYSIS_FAILED", {
+                            "status": "failed",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "error": str(e)
+                        })
 
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
