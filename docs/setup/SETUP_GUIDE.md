@@ -1,0 +1,405 @@
+# Quantiq 개발 환경 설정 가이드
+
+## 사전 요구사항
+
+### 필수 소프트웨어
+
+- **Docker**: 4.20+ ([설치](https://docs.docker.com/get-docker/))
+- **Docker Compose**: 2.0+ (Docker Desktop에 포함됨)
+- **Git**: 2.40+
+
+### 로컬 개발용 (선택사항)
+
+- **JDK 21**: Spring Boot 개발
+- **Python 3.11+**: Python 개발
+- **Poetry**: Python 패키지 관리
+
+## 빠른 시작 (Docker Compose)
+
+### 1단계: 저장소 클론
+
+```bash
+git clone <repository-url>
+cd quantiq
+```
+
+### 2단계: 환경 변수 설정
+
+```bash
+# .env 파일 생성
+cp .env.example .env  # 또는 직접 생성
+
+# .env 파일 편집 (필수 항목)
+FRED_API_KEY=your_fred_api_key
+KIS_APP_KEY=your_kis_app_key
+KIS_APP_SECRET=your_kis_app_secret
+KIS_ACCOUNT_NO=your_kis_account_number
+```
+
+**주요 설정값**:
+- **FRED_API_KEY**: Federal Reserve Economic Data API 키 (https://fred.stlouisfed.org/docs/api/fred/)
+- **KIS_*** 항목: 한국투자증권 OpenAPI 설정
+
+### 3단계: Docker Compose 시작
+
+```bash
+# 모든 서비스 시작
+docker-compose up -d
+
+# 시작 확인 (모든 컨테이너가 'Up' 상태)
+docker-compose ps
+
+# 로그 확인
+docker-compose logs -f
+```
+
+### 4단계: 서비스 확인
+
+```bash
+# Spring Boot 헬스 체크
+curl http://localhost:10010/health
+
+# Python FastAPI 문서
+open http://localhost:10020/docs
+
+# MongoDB 접속 (선택)
+docker-compose exec mongodb mongosh
+```
+
+### 5단계: 정지 및 정리
+
+```bash
+# 모든 컨테이너 정지
+docker-compose down
+
+# 볼륨 포함 삭제 (데이터 초기화)
+docker-compose down -v
+
+# 이미지 삭제
+docker-compose down --rmi all
+```
+
+---
+
+## 로컬 개발 환경 (고급)
+
+### Spring Boot 로컬 개발
+
+#### 사전 요구사항
+
+```bash
+# JDK 21 설치 확인
+java -version
+
+# Gradle 확인 (프로젝트에 포함됨)
+./gradlew --version
+```
+
+#### 개발 환경 설정
+
+```bash
+cd quantiq-core
+
+# 의존성 다운로드
+./gradlew build
+
+# 개발 서버 실행 (기본 포트: 8080)
+./gradlew bootRun
+
+# 또는 IDE에서 QuantiqCoreApplication.kt 실행
+```
+
+#### IDE 설정 (IntelliJ)
+
+1. **Kotlin Plugin** 설치
+2. **Project Structure**:
+   - Project SDK: JDK 21
+   - Project Language Level: 21
+3. **Run Configuration**:
+   - Main class: `com.quantiq.core.QuantiqCoreApplication`
+   - VM options: `-Xmx512m`
+
+---
+
+### Python 로컬 개발
+
+#### Poetry 설치
+
+```bash
+# macOS (Homebrew)
+brew install poetry
+
+# 또는 pip
+pip install poetry
+
+# 버전 확인
+poetry --version
+```
+
+#### 개발 환경 설정
+
+```bash
+cd quantiq-data-engine
+
+# 의존성 설치
+poetry install
+
+# 가상환경 활성화
+poetry shell
+
+# 또는 poetry run 사용
+poetry run python src/main.py
+```
+
+#### 개발 서버 실행
+
+```bash
+# 자동 리로드 모드
+poetry run uvicorn src.main:app --reload --port 8000
+
+# 또는
+poetry run python src/main.py
+```
+
+#### IDE 설정 (VS Code)
+
+1. **Python Extension** 설치
+2. **Interpreter 설정**:
+   ```bash
+   poetry env info -p  # 가상환경 경로 확인
+   ```
+3. `.vscode/settings.json`:
+   ```json
+   {
+     "python.defaultInterpreterPath": "<poetry-env-path>/bin/python",
+     "python.linting.enabled": true,
+     "python.linting.flake8Enabled": true,
+     "python.formatting.provider": "black"
+   }
+   ```
+
+---
+
+## 포트 충돌 해결
+
+### 포트 확인
+
+```bash
+# 사용 중인 포트 확인
+lsof -i :8080   # Spring Boot
+lsof -i :8000   # Python
+lsof -i :9092   # Kafka
+lsof -i :27017  # MongoDB
+```
+
+### 포트 변경
+
+#### Docker Compose 포트 변경
+
+```yaml
+# docker-compose.yml 수정
+services:
+  quantiq-core:
+    ports:
+      - "10011:8080"  # 호스트 포트 변경
+```
+
+#### 로컬 개발 포트 변경
+
+```bash
+# Spring Boot
+./gradlew bootRun --args='--server.port=8081'
+
+# Python FastAPI
+poetry run uvicorn src.main:app --port 8001
+```
+
+---
+
+## 데이터베이스 설정
+
+### MongoDB 접속
+
+```bash
+# Docker 컨테이너 내 MongoDB 셸
+docker-compose exec mongodb mongosh
+
+# 기본 명령어
+show dbs                    # 데이터베이스 목록
+use stock_trading           # 데이터베이스 선택
+show collections            # 컬렉션 목록
+db.users.find()             # 문서 조회
+```
+
+### MongoDB 백업/복원
+
+```bash
+# 백업
+docker-compose exec mongodb mongodump --out=/backup
+
+# 복원
+docker-compose exec mongodb mongorestore /backup
+```
+
+---
+
+## Kafka 설정 및 테스트
+
+### Kafka 토픽 관리
+
+```bash
+# Kafka 컨테이너 접속
+docker-compose exec kafka bash
+
+# 토픽 생성
+kafka-topics --bootstrap-server localhost:9092 \
+  --create --topic stock-recommendations \
+  --partitions 1 --replication-factor 1
+
+# 토픽 목록 확인
+kafka-topics --bootstrap-server localhost:9092 --list
+
+# 토픽 삭제
+kafka-topics --bootstrap-server localhost:9092 \
+  --delete --topic stock-recommendations
+```
+
+### 메시지 테스트
+
+```bash
+# 메시지 소비 (모니터링)
+kafka-console-consumer --bootstrap-server localhost:9092 \
+  --topic stock-recommendations --from-beginning
+
+# 다른 터미널에서 메시지 발행 (테스트)
+kafka-console-producer --bootstrap-server localhost:9092 \
+  --topic stock-recommendations
+
+# 메시지 입력 후 Enter
+{"ticker": "AAPL", "signal": "BUY", "price": 150.25}
+```
+
+---
+
+## 네트워크 및 환경 변수
+
+### Docker 네트워크
+
+```bash
+# 네트워크 확인
+docker network ls
+
+# Quantiq 네트워크 검사
+docker network inspect <quantiq-network-name>
+
+# 컨테이너 간 통신 테스트
+docker-compose exec quantiq-core ping mongodb
+```
+
+### 환경 변수 관리
+
+```bash
+# 환경 변수 확인
+docker-compose config | grep MONGODB_URI
+
+# 실행 중인 컨테이너 환경 변수 확인
+docker-compose exec quantiq-core env | grep SPRING
+```
+
+---
+
+## 문제 해결
+
+### 서비스가 시작되지 않음
+
+```bash
+# 로그 확인
+docker-compose logs quantiq-core
+docker-compose logs quantiq-data-engine
+
+# 특정 서비스만 재시작
+docker-compose restart quantiq-core
+
+# 컨테이너 정지 후 재빌드
+docker-compose down
+docker-compose up -d --build
+```
+
+### 포트 이미 사용 중
+
+```bash
+# 프로세스 종료
+lsof -i :8080 -t | xargs kill -9
+
+# 또는 Docker 컨테이너 정지
+docker-compose down
+```
+
+### MongoDB 연결 실패
+
+```bash
+# MongoDB 상태 확인
+docker-compose logs mongodb
+
+# MongoDB 재시작
+docker-compose restart mongodb
+
+# 볼륨 초기화
+docker-compose down -v
+docker-compose up -d
+```
+
+### Kafka 메시지 안 옴
+
+```bash
+# Kafka 상태 확인
+docker-compose logs kafka
+
+# 토픽 확인
+docker-compose exec kafka kafka-topics \
+  --bootstrap-server localhost:9092 --list
+
+# Producer 로그 확인
+docker-compose logs quantiq-data-engine
+```
+
+---
+
+## 성능 튜닝
+
+### JVM 메모리 설정
+
+```bash
+# docker-compose.yml에서
+environment:
+  JAVA_OPTS: "-Xms256m -Xmx512m"
+```
+
+### Python 메모리 제한
+
+```yaml
+# docker-compose.yml에서
+quantiq-data-engine:
+  deploy:
+    resources:
+      limits:
+        memory: 1G
+      reservations:
+        memory: 512M
+```
+
+### Kafka 성능
+
+```bash
+# 파티션 수 증가 (병렬 처리)
+kafka-topics --bootstrap-server localhost:9092 \
+  --alter --topic stock-recommendations --partitions 3
+```
+
+---
+
+## 다음 단계
+
+- [COMMANDS.md](COMMANDS.md) - 개발 명령어
+- [CODE_STYLE.md](CODE_STYLE.md) - 코딩 컨벤션
+- [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) - 프로젝트 개요
