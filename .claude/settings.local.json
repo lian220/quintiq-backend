@@ -28,7 +28,10 @@
       "Bash(python3:*)",
       "Bash(git rm:*)",
       "Bash(done)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(tree:*)",
+      "Bash(__NEW_LINE_ad284566c8d145fa__ echo \"=== 📁 docs/architecture/ ===\")",
+      "Bash(__NEW_LINE_ad284566c8d145fa__ echo \"\")"
     ]
   }
 }

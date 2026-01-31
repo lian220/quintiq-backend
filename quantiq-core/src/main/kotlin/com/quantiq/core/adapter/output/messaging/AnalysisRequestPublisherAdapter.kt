@@ -1,14 +1,18 @@
-package com.quantiq.core.service
+package com.quantiq.core.adapter.output.messaging
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 
-@Service
-class AnalysisRequestProducer(
-        private val kafkaTemplate: KafkaTemplate<String, String>,
-        private val objectMapper: ObjectMapper
+/**
+ * Analysis Request Publisher Adapter (Output Adapter)
+ * 분석 요청 메시지를 Kafka로 발행합니다.
+ */
+@Component
+class AnalysisRequestPublisherAdapter(
+    private val kafkaTemplate: KafkaTemplate<String, String>,
+    private val objectMapper: ObjectMapper
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val TOPIC = "quantiq.analysis.request"

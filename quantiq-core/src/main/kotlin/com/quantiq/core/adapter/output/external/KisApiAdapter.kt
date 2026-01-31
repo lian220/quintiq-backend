@@ -1,19 +1,27 @@
-package com.quantiq.core.service
+package com.quantiq.core.adapter.output.external
 
 import com.quantiq.core.config.KisConfig
 import com.quantiq.core.domain.KisToken
+import com.quantiq.core.domain.trading.port.output.TradingApiPort
 import com.quantiq.core.repository.KisTokenRepository
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 
-@Service
-class KisClient(private val kisConfig: KisConfig, private val tokenRepository: KisTokenRepository) {
-    private val logger = LoggerFactory.getLogger(KisClient::class.java)
+/**
+ * KIS API Adapter (Output Adapter)
+ * TradingApiPort를 구현하여 한국투자증권 API와 연동합니다.
+ */
+@Component
+class KisApiAdapter(
+    private val kisConfig: KisConfig,
+    private val tokenRepository: KisTokenRepository
+) : TradingApiPort {
+    private val logger = LoggerFactory.getLogger(KisApiAdapter::class.java)
     private val webClient = WebClient.builder().baseUrl(kisConfig.baseUrl).build()
 
     private val lastApiCallTime = AtomicLong(0)
@@ -23,7 +31,7 @@ class KisClient(private val kisConfig: KisConfig, private val tokenRepository: K
     private var accessToken: String? = null
     private var expiresAt: LocalDateTime? = null
 
-    fun getAccessToken(userId: String = "lian"): String {
+    override fun getAccessToken(userId: String): String {
         val now = LocalDateTime.now()
 
         // 1. Memory cache
@@ -96,7 +104,7 @@ class KisClient(private val kisConfig: KisConfig, private val tokenRepository: K
         lastApiCallTime.set(System.currentTimeMillis())
     }
 
-    fun getOverseasBalance(exchange: String = "NASD"): Map<String, Any> {
+    override fun getOverseasBalance(exchange: String): Map<String, Any> {
         waitForRateLimit()
         val token = getAccessToken()
 
@@ -127,6 +135,4 @@ class KisClient(private val kisConfig: KisConfig, private val tokenRepository: K
                 Map<String, Any>?
                 ?: emptyMap()
     }
-
-    // Add more methods mapping to legacy balance_service.py as needed...
 }

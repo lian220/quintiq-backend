@@ -1,17 +1,18 @@
-package com.quantiq.core.service
+package com.quantiq.core.adapter.input.messaging
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.quantiq.core.events.EventTopics
+import com.quantiq.core.service.AutoTradingService
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 
 /**
- * Kafka Event Listener
+ * Kafka Event Listener Adapter (Input Adapter)
  * quantiq-data-engine에서 발행된 이벤트를 수신하여 처리합니다.
  */
-@Service
-class KafkaMessageListener(
+@Component
+class KafkaEventListenerAdapter(
     private val objectMapper: ObjectMapper,
     private val autoTradingService: AutoTradingService
 ) {

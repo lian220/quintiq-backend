@@ -1,5 +1,6 @@
 package com.quantiq.core.service
 
+import com.quantiq.core.domain.trading.port.output.TradingApiPort
 import com.quantiq.core.entity.AccountBalanceEntity
 import com.quantiq.core.entity.UserEntity
 import com.quantiq.core.repository.jpa.AccountBalanceJpaRepository
@@ -11,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class BalanceService(
-    private val kisClient: KisClient,
+    private val tradingApiPort: TradingApiPort,
     private val accountBalanceJpaRepository: AccountBalanceJpaRepository,
     private val userJpaRepository: UserJpaRepository
 ) {
@@ -21,7 +22,7 @@ class BalanceService(
      * KIS API를 통해 해외 잔고 조회
      */
     fun getOverseasBalance(): Map<String, Any> {
-        val result = kisClient.getOverseasBalance()
+        val result = tradingApiPort.getOverseasBalance()
 
         val output1 = result["output1"] as? List<Map<String, Any>> ?: emptyList()
         val output2 = result["output2"] as? List<Any> ?: emptyList()
