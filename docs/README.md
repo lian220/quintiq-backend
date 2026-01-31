@@ -1,21 +1,36 @@
 # 📚 Quantiq 프로젝트 문서
 
-RDB 마이그레이션 및 시스템 아키텍처 최적화를 위한 완전한 문서 가이드입니다.
+알고리즘 트레이딩 플랫폼 Quantiq의 전체 문서입니다.
 
 ## 🗂️ 폴더 구조
 
 ```
 docs/
-├── README.md               📖 메인 인덱스
-├── architecture/           🏗️ 시스템 아키텍처
-├── features/               🎯 기능 명세 및 로드맵
-├── guidelines/             📋 개발 가이드라인
-├── migration/              🔄 RDB 마이그레이션
-├── setup/                  ⚙️ 설정 및 배포
-└── legacy/                 📦 레거시 참고 문서
+├── todo/                    📋 TODO 및 개발 계획 ⭐ 시작점
+├── architecture/            🏗️ 시스템 아키텍처
+├── setup/                   ⚙️ 개발 환경 & 배포
+├── features/                ⭐ 주요 기능 & 분석
+├── migration/               🔄 마이그레이션 가이드
+├── guidelines/              📖 개발 가이드라인
+└── legacy/                  📦 레거시 문서 (참고용)
 ```
 
 ## 📋 주요 섹션
+
+### 📋 [TODO 및 개발 계획](./todo/) ⭐ 먼저 여기부터!
+**모든 TODO 항목과 향후 개선 계획**
+- 🔴 긴급: Phase 2 데이터 엔진 통합
+- 🟡 중요: 데이터베이스 마이그레이션 완료
+- 🟢 추후: Phase 3 자동 매매 시스템
+
+**주요 파일**
+- `Phase1_스펙.md` - 기본 인프라 구축 (✅ 완료)
+- `Phase2_스펙.md` - 데이터 엔진 통합 (🔄 진행 중)
+- `Phase3_스펙.md` - 자동 매매 시스템 (🔜 예정)
+- `데이터베이스_마이그레이션_TODO.md` - DB 마이그레이션 계획
+- `스케줄러_마이그레이션_TODO.md` - 스케줄러 마이그레이션
+
+---
 
 ### 🏗️ [아키텍처](./architecture/)
 **시스템 설계 및 구조**
@@ -24,7 +39,6 @@ docs/
 ### 🎯 [기능 명세](./features/)
 **기능 로드맵 및 상세 스펙**
 - `FEATURE_ROADMAP.md` - 전체 로드맵
-- `PHASE_1~3_SPECS.md` - 단계별 구현 스펙
 - `ANALYSIS_ARCHITECTURE.md` - 분석 시스템 설계
 
 ### 📋 [가이드라인](./guidelines/)
@@ -48,15 +62,19 @@ docs/
 
 ## 🚀 빠른 시작
 
-1. **처음 시작하시나요?**
+1. **다음에 뭘 해야 하는지 모르겠어요?** ⭐
+   - [TODO 폴더](./todo/) 확인하기
+   - 우선순위별 작업 계획 확인
+
+2. **처음 시작하시나요?**
    - [PROJECT_OVERVIEW](./guidelines/PROJECT_OVERVIEW.md) 읽기
    - [QUICK_START_RDB](./setup/QUICK_START_RDB.md) 따라하기
 
-2. **마이그레이션 진행 중?**
+3. **마이그레이션 진행 중?**
    - [RDB_MIGRATION_PLAN](./migration/RDB_MIGRATION_PLAN.md) 확인
    - [DATABASE_IMPLEMENTATION](./migration/DATABASE_IMPLEMENTATION.md) 참고
 
-3. **개발 중?**
+4. **개발 중?**
    - [CODE_STYLE](./guidelines/CODE_STYLE.md) 확인
    - [COMMANDS](./setup/COMMANDS.md) 참고
    - [ARCHITECTURE](./architecture/ARCHITECTURE.md) 이해
@@ -65,6 +83,7 @@ docs/
 
 | 상황 | 참고 문서 |
 |------|---------|
+| **다음에 뭘 해야 하는지 모르겠어요** ⭐ | **[TODO](./todo/)** |
 | 프로젝트를 이해하고 싶어요 | [프로젝트 개요](./guidelines/PROJECT_OVERVIEW.md) |
 | 개발 환경을 설정하고 싶어요 | [설정 가이드](./setup/SETUP_GUIDE.md) |
 | 빠르게 시작하고 싶어요 | [빠른 시작](./setup/QUICK_START_RDB.md) |
@@ -76,4 +95,4 @@ docs/
 | 코드 스타일을 알고 싶어요 | [코드 스타일](./guidelines/CODE_STYLE.md) |
 | 커맨드를 알고 싶어요 | [커맨드](./setup/COMMANDS.md) |
 
-**마지막 업데이트**: 2026-01-30
+**마지막 업데이트**: 2026-01-31
