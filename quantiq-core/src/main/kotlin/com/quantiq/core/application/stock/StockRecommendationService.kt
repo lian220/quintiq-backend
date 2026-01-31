@@ -1,4 +1,4 @@
-package com.quantiq.core.service
+package com.quantiq.core.application.stock
 
 import com.quantiq.core.repository.*
 import java.time.LocalDate

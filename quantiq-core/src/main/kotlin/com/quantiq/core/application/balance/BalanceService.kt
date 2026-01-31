@@ -1,4 +1,4 @@
-package com.quantiq.core.service
+package com.quantiq.core.application.balance
 
 import com.quantiq.core.domain.trading.port.output.TradingApiPort
 import com.quantiq.core.adapter.output.persistence.jpa.AccountBalanceEntity

@@ -2,7 +2,7 @@ package com.quantiq.core.adapter.input.messaging
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.quantiq.core.events.EventTopics
-import com.quantiq.core.service.AutoTradingService
+import com.quantiq.core.application.trading.AutoTradingService
 import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component

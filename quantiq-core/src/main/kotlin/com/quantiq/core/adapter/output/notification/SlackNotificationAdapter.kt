@@ -1,7 +1,7 @@
 package com.quantiq.core.adapter.output.notification
 
 import com.quantiq.core.domain.economic.port.output.NotificationSender
-import com.quantiq.core.service.SlackNotificationService
+import com.quantiq.core.adapter.output.notification.slack.SlackApiClient
 import org.springframework.stereotype.Component
 
 /**
@@ -10,14 +10,14 @@ import org.springframework.stereotype.Component
  */
 @Component
 class SlackNotificationAdapter(
-    private val slackNotificationService: SlackNotificationService
+    private val slackApiClient: SlackApiClient
 ) : NotificationSender {
 
     override fun notifyEconomicDataUpdateRequest(requestId: String): String? {
-        return slackNotificationService.notifyEconomicDataUpdateRequest(requestId)
+        return slackApiClient.notifyEconomicDataUpdateRequest(requestId)
     }
 
     override fun notifyEconomicDataCollectionError(requestId: String, error: String) {
-        slackNotificationService.notifyEconomicDataCollectionError(requestId, error)
+        slackApiClient.notifyEconomicDataCollectionError(requestId, error)
     }
 }

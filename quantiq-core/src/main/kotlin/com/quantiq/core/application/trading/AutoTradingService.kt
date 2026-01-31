@@ -1,4 +1,4 @@
-package com.quantiq.core.service
+package com.quantiq.core.application.trading
 
 import com.quantiq.core.adapter.output.persistence.jpa.*
 import com.quantiq.core.repository.StockRecommendationRepository

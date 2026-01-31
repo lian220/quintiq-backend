@@ -1,19 +1,19 @@
-package com.quantiq.core.service
+package com.quantiq.core.adapter.output.notification.slack
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.stereotype.Service
+import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import java.time.ZonedDateTime
 import java.time.ZoneId
 
 /**
- * Slack 알림 서비스 (Thread 지원 - Slack API 기반)
- * 경제 데이터 스케줄러 이벤트를 Slack으로 통지합니다.
+ * Slack API Client (Output Adapter Infrastructure)
+ * Slack API와 직접 통신하여 알림을 전송합니다.
  */
-@Service
-class SlackNotificationService(
+@Component
+class SlackApiClient(
     private val webClient: WebClient
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
