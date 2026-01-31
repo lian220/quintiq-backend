@@ -1,8 +1,8 @@
 package com.quantiq.core.service
 
 import com.quantiq.core.domain.trading.port.output.TradingApiPort
-import com.quantiq.core.entity.AccountBalanceEntity
-import com.quantiq.core.entity.UserEntity
+import com.quantiq.core.adapter.output.persistence.jpa.AccountBalanceEntity
+import com.quantiq.core.adapter.output.persistence.jpa.UserEntity
 import com.quantiq.core.repository.jpa.AccountBalanceJpaRepository
 import com.quantiq.core.repository.jpa.UserJpaRepository
 import java.math.BigDecimal

@@ -1,4 +1,4 @@
-package com.quantiq.core.entity
+package com.quantiq.core.adapter.output.persistence.jpa
 
 import jakarta.persistence.*
 import java.math.BigDecimal

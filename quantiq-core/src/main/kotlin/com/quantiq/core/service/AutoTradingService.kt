@@ -1,6 +1,6 @@
 package com.quantiq.core.service
 
-import com.quantiq.core.entity.*
+import com.quantiq.core.adapter.output.persistence.jpa.*
 import com.quantiq.core.repository.StockRecommendationRepository
 import com.quantiq.core.repository.jpa.TradingConfigJpaRepository
 import com.quantiq.core.repository.jpa.TradeJpaRepository

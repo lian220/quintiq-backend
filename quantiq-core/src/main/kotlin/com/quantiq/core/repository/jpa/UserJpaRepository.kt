@@ -1,7 +1,7 @@
 package com.quantiq.core.repository.jpa
 
-import com.quantiq.core.entity.UserEntity
-import com.quantiq.core.entity.UserStatus
+import com.quantiq.core.adapter.output.persistence.jpa.UserEntity
+import com.quantiq.core.adapter.output.persistence.jpa.UserStatus
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository

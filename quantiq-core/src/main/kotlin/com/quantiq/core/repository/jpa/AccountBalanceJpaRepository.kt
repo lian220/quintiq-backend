@@ -1,6 +1,6 @@
 package com.quantiq.core.repository.jpa
 
-import com.quantiq.core.entity.AccountBalanceEntity
+import com.quantiq.core.adapter.output.persistence.jpa.AccountBalanceEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query

@@ -1,7 +1,7 @@
 package com.quantiq.core.repository.jpa
 
-import com.quantiq.core.entity.ExecutionDecision
-import com.quantiq.core.entity.TradeSignalExecutedEntity
+import com.quantiq.core.adapter.output.persistence.jpa.ExecutionDecision
+import com.quantiq.core.adapter.output.persistence.jpa.TradeSignalExecutedEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository

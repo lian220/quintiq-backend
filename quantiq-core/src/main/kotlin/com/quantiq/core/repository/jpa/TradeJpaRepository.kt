@@ -1,8 +1,8 @@
 package com.quantiq.core.repository.jpa
 
-import com.quantiq.core.entity.TradeEntity
-import com.quantiq.core.entity.TradeSide
-import com.quantiq.core.entity.TradeStatus
+import com.quantiq.core.adapter.output.persistence.jpa.TradeEntity
+import com.quantiq.core.adapter.output.persistence.jpa.TradeSide
+import com.quantiq.core.adapter.output.persistence.jpa.TradeStatus
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository

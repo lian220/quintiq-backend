@@ -1,6 +1,6 @@
 package com.quantiq.core.repository.jpa
 
-import com.quantiq.core.entity.TradingConfigEntity
+import com.quantiq.core.adapter.output.persistence.jpa.TradingConfigEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
