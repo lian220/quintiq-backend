@@ -40,10 +40,36 @@
 - [x] `EconomicDataSchedulerService` → Event 발행
 - [x] Backward Compatibility (Legacy 토픽 지원)
 
-#### 5. 문서화
+#### 5. 분석 이벤트 시스템 구현 (2026-01-31 추가)
+- [x] 분석 요청 이벤트 (Kotlin → Python)
+  - [x] `analysis.technical.request` - 기술적 분석 요청
+  - [x] `analysis.sentiment.request` - 뉴스 감정 분석 요청
+  - [x] `analysis.combined.request` - 통합 분석 요청
+- [x] 분석 완료 이벤트 (Python → Kotlin)
+  - [x] `analysis.technical.completed` - 기술적 분석 완료
+  - [x] `analysis.sentiment.completed` - 감정 분석 완료
+  - [x] `analysis.completed` - 통합 분석 완료
+- [x] Slack 스레드 패턴 구현
+  - [x] Kotlin: Slack 스레드 생성 및 threadTs 획득
+  - [x] Kotlin: Kafka 메시지에 threadTs 포함
+  - [x] Python: threadTs로 스레드 답글 형태로 진행상황 업데이트
+- [x] Python 분석 서비스
+  - [x] `RecommendationService` - 통합 분석 레이어
+  - [x] `TechnicalAnalysisService` - SMA, RSI, MACD 계산
+  - [x] `SentimentAnalysisService` - Alpha Vantage NEWS_SENTIMENT API
+  - [x] 통합 점수 계산: 기술적(70%) + 감정(30%) 가중평균
+- [x] 스케줄러 Job 구현
+  - [x] `CombinedAnalysisJobAdapter` (23:45) - 통합 분석
+  - [x] Domain/Application/Adapter 레이어 구현
+
+#### 6. 문서화
 - [x] Event Schema 문서
 - [x] Event-Driven 사용 가이드
 - [x] 테스트 방법 및 트러블슈팅
+- [x] 분석 이벤트 스키마 (2026-01-31 추가)
+  - [x] 기술적/감정/통합 분석 이벤트 정의
+  - [x] Slack 스레드 패턴 문서화
+  - [x] 통합 점수 계산식 문서화
 
 ### 구현된 이벤트 Flow
 

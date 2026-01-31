@@ -793,6 +793,29 @@ quantiq-core/src/main/kotlin/com/quantiq/core/adapter/input/scheduler/
 **Low Priority (유지보수)**
 5. SCHEDULE_CLEANUP_ORDERS (06:30) - 주문 정리
 
+### 🆕 추가 개선사항 (2026-02-01)
+
+**자동 매도 실시간 모니터링 추가**
+
+| 항목 | 내용 |
+|------|------|
+| **Job 이름** | SCHEDULE_AUTO_SELL |
+| **실행 주기** | 매 1분마다 (SimpleSchedule) |
+| **역할** | 실시간 매도 조건 확인 및 실행 |
+| **시장 검증** | 미국 시장 시간만 (평일 9:30 AM - 4:00 PM ET) |
+| **구현 상태** | ✅ 완료 (2026-02-01) |
+| **참고** | banbu-stocktrading 스타일 실시간 매도 모니터링 |
+
+**특징:**
+- 매 1분마다 반복 실행 (Quartz SimpleSchedule)
+- 미국 시장 시간 외에는 건너뜀 (리소스 절약)
+- 평일만 실행 (주말 제외)
+- 손절/익절 조건 자동 체크
+
+**구현 파일:**
+- `AutoSellJobAdapter.kt` - Job Adapter (Input)
+- `QuartzConfig.kt` - Job & Trigger 등록
+
 ---
 
 **다음 액션:**

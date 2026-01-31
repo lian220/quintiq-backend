@@ -174,4 +174,28 @@ class QuartzConfig {
             .build()
     }
 
+    // ========================
+    // 8. 자동 매도 체크 (매 1분)
+    // ========================
+    @Bean
+    fun autoSellJobDetail(): JobDetail {
+        return JobBuilder.newJob(AutoSellJobAdapter::class.java)
+            .withIdentity("autoSellJob")
+            .storeDurably()
+            .build()
+    }
+
+    @Bean
+    fun autoSellTrigger(): Trigger {
+        return TriggerBuilder.newTrigger()
+            .forJob(autoSellJobDetail())
+            .withIdentity("autoSellTrigger")
+            .withSchedule(
+                SimpleScheduleBuilder.simpleSchedule()
+                    .withIntervalInMinutes(1)
+                    .repeatForever()
+            )
+            .build()
+    }
+
 }
