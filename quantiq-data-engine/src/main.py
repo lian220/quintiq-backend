@@ -1,5 +1,9 @@
 """
-Quantiq Data Engine - Feature-based Architecture
+Quantiq Data Engine - Message Processing Worker
+
+Architecture:
+- Primary: Kafka message processing (all data operations)
+- Secondary: Read-only REST API (health checks, status queries)
 """
 import logging
 import json
@@ -26,10 +30,13 @@ KST = timezone('Asia/Seoul')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# FastAPI app
-app = FastAPI(title="Quantiq Data Engine")
+# FastAPI app (Read-Only Status API)
+app = FastAPI(
+    title="Quantiq Data Engine",
+    description="Message Processing Worker with Read-Only Status API"
+)
 
-# Include routers
+# Include routers (status endpoints only)
 app.include_router(economic_router)
 app.include_router(ml_package_router)
 
@@ -37,10 +44,16 @@ app.include_router(ml_package_router)
 @app.get("/")
 def read_root():
     return {
-        "status": "Quantiq Data Engine is running (Feature-based Architecture)",
-        "kafka_topics": [
-            "economic.data.update.request"
+        "service": "Quantiq Data Engine",
+        "architecture": "Message Processing Worker",
+        "status": "running",
+        "subscribed_kafka_topics": [
+            "economic.data.update.request",
+            "analysis.technical.request",
+            "analysis.sentiment.request",
+            "analysis.combined.request"
         ],
+        "api_purpose": "Read-only health checks and status queries",
         "timestamp": datetime.now(KST).isoformat()
     }
 
