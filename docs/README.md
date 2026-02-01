@@ -61,6 +61,7 @@ docs/
 
 **환경 설정**
 - `환경설정_가이드.md` - 개발 환경 설정
+- `환경변수_관리_가이드.md` - 환경변수 중앙 관리
 - `RDB_빠른시작.md` - PostgreSQL 기반 빠른 시작
 - `로컬_테스트_가이드.md` - 로컬 테스트 방법
 
@@ -78,15 +79,14 @@ docs/
 
 ### 💼 [KIS API](./kis/)
 **한국투자증권 API 연동**
+- `사용자_KIS_계정_가이드.md` - 사용자별 KIS 계정 관리
 - `KIS_OVERSEAS_STOCK_API.md` - 해외주식 API 명세
 
 ---
 
 ### 🔐 [인증 및 보안](.)
-**사용자 인증 및 KIS 계정 관리**
-- `AUTHENTICATION_GUIDE.md` - 인증 시스템 가이드
-- `USER_KIS_ACCOUNT_GUIDE.md` - 사용자별 KIS 계정 관리
-- `ENV_MANAGEMENT_GUIDE.md` - 환경변수 관리
+**사용자 인증 및 환경 관리**
+- `인증_가이드.md` - 인증 시스템 가이드 (root)
 
 ---
 
@@ -177,9 +177,9 @@ docs/
 | **DB 설계** | [데이터베이스_설계](./architecture/데이터베이스_설계.md) |
 | **스케줄러 운영** | [스케줄러_운영_가이드](./setup/스케줄러_운영_가이드.md) |
 | **Slack 연동** | [Slack_설정_가이드](./setup/Slack_설정_가이드.md) |
-| **KIS 계정 관리** | [USER_KIS_ACCOUNT_GUIDE](./USER_KIS_ACCOUNT_GUIDE.md) |
-| **인증 시스템** | [AUTHENTICATION_GUIDE](./AUTHENTICATION_GUIDE.md) |
-| **환경변수 관리** | [ENV_MANAGEMENT_GUIDE](./ENV_MANAGEMENT_GUIDE.md) |
+| **KIS 계정 관리** | [사용자_KIS_계정_가이드](./kis/사용자_KIS_계정_가이드.md) |
+| **인증 시스템** | [인증_가이드](./인증_가이드.md) |
+| **환경변수 관리** | [환경변수_관리_가이드](./setup/환경변수_관리_가이드.md) |
 | **배포 방법** | [배포_가이드](./setup/배포_운영_가이드.md) |
 | **시스템 구조** | [아키텍처](./architecture/ARCHITECTURE.md) |
 | **이벤트 구조** | [이벤트_스키마](./architecture/이벤트_스키마.md) |

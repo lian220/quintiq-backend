@@ -53,6 +53,37 @@ docs/
 - `scheduler_architecture.md` - 영문 (한글 우선)
 - `스케줄러-아키텍처.md` - 하이픈 사용
 
+### 파일 배치 규칙
+
+**목적별 디렉토리 배치:**
+- `docs/` (root) - 핵심 가이드만 (인증, 전체 아키텍처 등)
+- `docs/architecture/` - 시스템 설계 문서
+- `docs/setup/` - 환경 설정 및 운영 가이드
+- `docs/kis/` - KIS API 관련 모든 문서
+- `docs/features/` - 기능 명세 문서
+- `docs/guidelines/` - 개발 가이드라인
+- `docs/todo/` - TODO 및 계획 문서
+- `docs/analysis/` - 데이터 분석 결과
+- `docs/legacy/` - 구버전 참고 문서
+
+**배치 원칙:**
+1. **단일 책임**: 각 문서는 하나의 명확한 카테고리에 속함
+2. **접근성**: 자주 참조되는 문서는 상위 디렉토리에 배치
+3. **관련성**: 관련 문서끼리 같은 디렉토리에 그룹화
+4. **일관성**: 비슷한 성격의 문서는 같은 위치에 배치
+
+**예시:**
+```
+✅ 좋은 배치:
+- docs/인증_가이드.md (핵심 가이드 - root)
+- docs/setup/환경변수_관리_가이드.md (설정 관련 - setup)
+- docs/kis/사용자_KIS_계정_가이드.md (KIS 관련 - kis)
+
+❌ 나쁜 배치:
+- docs/kis/환경변수_관리_가이드.md (KIS와 무관 - 잘못된 위치)
+- docs/인증_시스템_상세_설계.md (상세 설계는 architecture로)
+```
+
 ---
 
 ## 📝 문서 작성 포맷
@@ -162,11 +193,29 @@ docker-compose up -d  # 인프라 시작
 
 ### 문서 이동 규칙
 
+**적절한 디렉토리로 이동:**
+```bash
+# 환경 설정 관련 문서 → setup/
+git mv docs/환경변수_관리_가이드.md docs/setup/
+
+# KIS API 관련 문서 → kis/
+git mv docs/사용자_KIS_계정_가이드.md docs/kis/
+
+# 아키텍처 관련 문서 → architecture/
+git mv docs/시스템_설계.md docs/architecture/
+```
+
 **레거시 문서 처리:**
 ```bash
 # MongoDB 기반 → PostgreSQL 기반으로 전환 시
-mv docs/architecture/MongoDB_설계.md docs/legacy/
+git mv docs/architecture/MongoDB_설계.md docs/legacy/
 ```
+
+**문서 이동 후 필수 작업:**
+1. `docs/README.md`에서 링크 업데이트
+2. `docs/todo/문서_완성도_체크리스트.md`에서 경로 수정
+3. 다른 문서에서 참조하는 링크 모두 업데이트
+4. 상대 경로 확인 및 수정
 
 **새 버전 작성:**
 - 구버전 삭제 금지 (legacy로 이동)
