@@ -1,0 +1,336 @@
+# KIS API Access Token 관리 시스템
+
+## 개요
+
+KIS (Korea Investment & Securities) API Access Token을 효율적으로 관리하기 위한 2단계 캐싱 시스템입니다.
+
+## 아키텍처
+
+### 토큰 조회 흐름
+
+```
+사용자 요청
+    ↓
+1️⃣ 메모리 캐시 확인 (ConcurrentHashMap)
+    ├─ HIT: 즉시 반환 (< 1ms)
+    └─ MISS: 다음 단계
+        ↓
+2️⃣ PostgreSQL 조회 (kis_tokens 테이블)
+    ├─ HIT: 메모리 캐시 업데이트 후 반환 (< 10ms)
+    └─ MISS: 다음 단계
+        ↓
+3️⃣ KIS API 호출 (새 토큰 발급)
+    ├─ 기존 토큰 비활성화 (deactivateUserTokens)
+    ├─ 새 토큰 PostgreSQL 저장
+    ├─ 메모리 캐시 업데이트
+    └─ 반환 (< 500ms)
+```
+
+## 데이터베이스 스키마
+
+### kis_tokens 테이블 (PostgreSQL)
+
+```sql
+CREATE TABLE kis_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    account_type VARCHAR(10) NOT NULL CHECK (account_type IN ('MOCK', 'REAL')),
+    access_token TEXT NOT NULL,
+    expiration_time TIMESTAMP NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_kis_tokens_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_user_account_type
+        UNIQUE(user_id, account_type)
+);
+```
+
+### 인덱스
+
+```sql
+-- 사용자별, 계정타입별 빠른 조회
+CREATE INDEX idx_kis_tokens_user_account
+    ON kis_tokens(user_id, account_type);
+
+-- 만료된 토큰 조회
+CREATE INDEX idx_kis_tokens_expiration
+    ON kis_tokens(expiration_time);
+
+-- 활성화된 토큰만 조회 (부분 인덱스)
+CREATE INDEX idx_kis_tokens_active
+    ON kis_tokens(is_active)
+    WHERE is_active = TRUE;
+```
+
+## 주요 기능
+
+### 1. 토큰 조회 (getAccessToken)
+
+```kotlin
+override fun getAccessToken(userId: String): String {
+    val now = LocalDateTime.now()
+
+    // 1. Memory cache
+    val cached = accessTokenCache[userId]
+    if (cached != null && now.isBefore(cached.second)) {
+        return cached.first
+    }
+
+    // 2. DB cache (PostgreSQL)
+    val kisAccount = getActiveKisAccount(userId)
+    val tokenEntity = tokenRepository.findLatestTokenByUserIdAndAccountType(
+        userId,
+        kisAccount.accountType
+    )
+
+    if (tokenEntity.isPresent && tokenEntity.get().isValid()) {
+        val token = tokenEntity.get()
+        accessTokenCache[userId] = Pair(token.accessToken, token.expirationTime)
+        return token.accessToken
+    }
+
+    // 3. New token from KIS
+    return refreshToken(userId, kisAccount)
+}
+```
+
+### 2. 토큰 갱신 (refreshToken)
+
+```kotlin
+@Transactional
+private fun refreshToken(userId: String, kisAccount: UserKisAccountEntity): String {
+    logger.info("Refreshing KIS access token for user: $userId, type: ${kisAccount.accountType}")
+
+    // KIS API 호출
+    val response = webClient.post()
+        .uri("/oauth2/tokenP")
+        .bodyValue(mapOf(
+            "grant_type" to "client_credentials",
+            "appkey" to kisAccount.appKey,
+            "appsecret" to appSecret
+        ))
+        .retrieve()
+        .bodyToMono(Map::class.java)
+        .block()
+
+    val token = response["access_token"] as String
+    val expiresIn = (response["expires_in"] as Int).toLong()
+    val expirationTime = LocalDateTime.now().plusSeconds(expiresIn)
+
+    // 기존 토큰 비활성화
+    tokenRepository.deactivateUserTokens(
+        kisAccount.user.id!!,
+        kisAccount.accountType,
+        LocalDateTime.now()
+    )
+
+    // 새 토큰 저장 (PostgreSQL)
+    val kisTokenEntity = KisTokenEntity(
+        user = kisAccount.user,
+        accountType = kisAccount.accountType,
+        accessToken = token,
+        expirationTime = expirationTime
+    )
+    tokenRepository.save(kisTokenEntity)
+
+    // 메모리 캐시 업데이트
+    accessTokenCache[userId] = Pair(token, expirationTime)
+
+    return token
+}
+```
+
+### 3. 만료된 토큰 자동 정리
+
+```kotlin
+@Scheduled(cron = "0 0 * * * *")  // 매시 정각
+fun cleanupExpiredTokens() {
+    val now = LocalDateTime.now()
+    val count = tokenRepository.deactivateExpiredTokens(now)
+    logger.info("Deactivated $count expired tokens")
+}
+```
+
+## 성능 특성
+
+### 응답 시간
+
+| 시나리오 | 응답 시간 | 캐시 계층 |
+|---------|---------|---------|
+| 메모리 캐시 HIT | < 1ms | Level 1 |
+| PostgreSQL HIT | < 10ms | Level 2 |
+| KIS API 호출 | < 500ms | Level 3 |
+
+### 동시성 처리
+
+- **메모리 캐시**: `ConcurrentHashMap` 사용으로 스레드 안전
+- **DB 트랜잭션**: `@Transactional`로 토큰 갱신 시 원자성 보장
+- **Unique 제약**: `(user_id, account_type)` 조합으로 중복 방지
+
+## 보안 고려사항
+
+### 1. 토큰 저장
+- PostgreSQL에 JWT 토큰 평문 저장 (이미 암호화된 JWT)
+- DB 접근 제어로 보안 유지
+- 토큰 만료 시간 엄격히 관리
+
+### 2. 토큰 무효화
+- 새 토큰 발급 시 기존 토큰 자동 비활성화
+- 만료된 토큰은 자동으로 is_active = false
+- 삭제하지 않고 비활성화하여 감사 추적 가능
+
+### 3. 사용자별 격리
+- 각 사용자는 MOCK, REAL 계정별로 독립적인 토큰 관리
+- Foreign Key로 데이터 무결성 보장
+- Cascade Delete로 사용자 삭제 시 토큰도 자동 삭제
+
+## 마이그레이션 히스토리
+
+### Phase 1: MongoDB (구버전)
+```
+access_tokens 컬렉션
+├─ 비구조화 데이터
+├─ 유연한 스키마
+└─ 단순 캐싱 용도
+```
+
+### Phase 2: PostgreSQL (현재)
+```
+kis_tokens 테이블
+├─ 구조화된 스키마
+├─ Foreign Key 제약
+├─ 인덱스 최적화
+├─ UNIQUE 제약으로 중복 방지
+└─ 트랜잭션 보장
+```
+
+### 마이그레이션 이유
+
+| 항목 | MongoDB | PostgreSQL |
+|------|---------|------------|
+| 데이터 구조 | 비구조화 | 구조화 |
+| 관계 무결성 | ❌ | ✅ Foreign Key |
+| 트랜잭션 | 제한적 | ✅ ACID |
+| 인덱스 성능 | 좋음 | 매우 좋음 |
+| 중복 방지 | 애플리케이션 레벨 | ✅ DB 제약 |
+| 사용자 계정 연동 | 참조만 | ✅ 강한 결합 |
+
+## 모니터링
+
+### 주요 메트릭
+
+```kotlin
+// 캐시 히트율
+val cacheHitRate = memoryHits / totalRequests * 100
+
+// 토큰 갱신 빈도
+val refreshRate = refreshCount / totalRequests * 100
+
+// 평균 응답 시간
+val avgResponseTime = totalTime / totalRequests
+```
+
+### 로깅
+
+```
+INFO  - Token cache HIT for user: lian (MOCK)
+INFO  - Token DB HIT for user: lian (REAL)
+INFO  - Refreshing KIS access token for user: lian, type: MOCK
+INFO  - Deactivated 5 expired tokens
+```
+
+## 운영 가이드
+
+### 토큰 수동 갱신
+
+```sql
+-- 특정 사용자 토큰 비활성화 (강제 갱신)
+UPDATE kis_tokens
+SET is_active = false, updated_at = NOW()
+WHERE user_id = 1 AND account_type = 'MOCK';
+```
+
+### 토큰 상태 확인
+
+```sql
+-- 활성화된 토큰 조회
+SELECT u.user_id, kt.account_type, kt.expiration_time, kt.is_active
+FROM kis_tokens kt
+JOIN users u ON kt.user_id = u.id
+WHERE kt.is_active = true
+ORDER BY kt.created_at DESC;
+```
+
+### 만료 임박 토큰 확인
+
+```sql
+-- 1시간 내 만료 예정 토큰
+SELECT u.user_id, kt.account_type, kt.expiration_time
+FROM kis_tokens kt
+JOIN users u ON kt.user_id = u.id
+WHERE kt.is_active = true
+  AND kt.expiration_time < NOW() + INTERVAL '1 hour'
+ORDER BY kt.expiration_time;
+```
+
+## 트러블슈팅
+
+### 토큰 갱신 실패
+
+```
+증상: KIS API 호출 시 401 Unauthorized
+원인: 만료된 토큰 또는 잘못된 credentials
+해결:
+1. kis_tokens 테이블에서 토큰 확인
+2. user_kis_accounts에서 app_key, app_secret 확인
+3. KIS API 응답 확인
+4. 메모리 캐시 초기화 (애플리케이션 재시작)
+```
+
+### 중복 토큰 오류
+
+```
+증상: UNIQUE constraint violation
+원인: 동시에 여러 요청이 토큰 생성 시도
+해결:
+- @Transactional 어노테이션으로 격리 수준 보장
+- deactivateUserTokens 먼저 호출 후 save
+```
+
+### 성능 저하
+
+```
+증상: 토큰 조회 시간 증가
+원인: 인덱스 미사용 또는 너무 많은 만료 토큰
+해결:
+1. EXPLAIN ANALYZE로 쿼리 계획 확인
+2. 만료된 토큰 주기적으로 정리
+3. 인덱스 리빌드 고려
+```
+
+## 향후 개선 계획
+
+### 1. Redis 캐싱 추가
+```
+메모리 → Redis → PostgreSQL → KIS API
+- 여러 인스턴스 간 캐시 공유
+- TTL 자동 관리
+```
+
+### 2. 토큰 프리패칭
+```
+- 만료 30분 전 자동 갱신
+- 사용자가 요청하기 전에 준비
+```
+
+### 3. 토큰 풀링
+```
+- 여러 토큰 동시 관리
+- 로드 밸런싱
+```

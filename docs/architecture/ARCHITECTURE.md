@@ -63,12 +63,17 @@
 │  └──────────────────────────────────────────────────────────┘   │
 │                            ↓                                     │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │          Data Storage (MongoDB)                         │   │
-│  │  ├─ Users Collection                                   │   │
-│  │  ├─ Stock Recommendations Collection                   │   │
-│  │  ├─ Trading History Collection                         │   │
-│  │  ├─ Balance & Portfolio Collection                     │   │
-│  │  └─ Analysis Results Collection                        │   │
+│  │          Data Storage (PostgreSQL + MongoDB)           │   │
+│  │  PostgreSQL (구조화 데이터):                            │   │
+│  │  ├─ users (사용자 정보)                                │   │
+│  │  ├─ user_kis_accounts (KIS 계정)                       │   │
+│  │  ├─ kis_tokens (API Access Token)                      │   │
+│  │  └─ daily_stock_data (주가 데이터)                      │   │
+│  │                                                          │   │
+│  │  MongoDB (비구조화 데이터):                             │   │
+│  │  ├─ stock_recommendations (추천 신호)                   │   │
+│  │  ├─ trading_history (거래 이력)                        │   │
+│  │  └─ analysis_results (분석 결과)                        │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -261,19 +266,61 @@ class AutoTradingService(
 
 ### 5. Data Access Layer
 
-#### MongoDB 구조
+#### PostgreSQL 구조 (Primary - 구조화 데이터)
+
+```
+Database: stock_trading
+
+Tables:
+├─ users
+│  ├─ id: BIGSERIAL PRIMARY KEY
+│  ├─ user_id: VARCHAR (unique, login ID)
+│  ├─ email: VARCHAR
+│  ├─ password: VARCHAR (hashed)
+│  ├─ created_at: TIMESTAMP
+│  └─ updated_at: TIMESTAMP
+│
+├─ user_kis_accounts
+│  ├─ id: BIGSERIAL PRIMARY KEY
+│  ├─ user_id: BIGINT (FK → users)
+│  ├─ account_type: VARCHAR ('MOCK' / 'REAL')
+│  ├─ app_key: VARCHAR
+│  ├─ app_secret_encrypted: TEXT (암호화됨)
+│  ├─ account_number: VARCHAR
+│  ├─ account_product_code: VARCHAR
+│  ├─ is_active: BOOLEAN
+│  ├─ created_at: TIMESTAMP
+│  └─ updated_at: TIMESTAMP
+│
+├─ kis_tokens (KIS API Access Token 캐싱)
+│  ├─ id: BIGSERIAL PRIMARY KEY
+│  ├─ user_id: BIGINT (FK → users)
+│  ├─ account_type: VARCHAR ('MOCK' / 'REAL')
+│  ├─ access_token: TEXT (JWT)
+│  ├─ expiration_time: TIMESTAMP
+│  ├─ is_active: BOOLEAN
+│  ├─ created_at: TIMESTAMP
+│  └─ updated_at: TIMESTAMP
+│  └─ UNIQUE(user_id, account_type)
+│
+└─ daily_stock_data
+   ├─ id: BIGSERIAL PRIMARY KEY
+   ├─ ticker: VARCHAR
+   ├─ date: DATE
+   ├─ open: DECIMAL
+   ├─ high: DECIMAL
+   ├─ low: DECIMAL
+   ├─ close: DECIMAL
+   ├─ volume: BIGINT
+   └─ UNIQUE(ticker, date)
+```
+
+#### MongoDB 구조 (Secondary - 비구조화 데이터)
 
 ```
 Database: stock_trading
 
 Collections:
-├─ users
-│  ├─ _id: ObjectId
-│  ├─ email: String
-│  ├─ password: String (hashed)
-│  ├─ createdAt: DateTime
-│  └─ metadata: Object
-│
 ├─ stock_recommendations
 │  ├─ _id: ObjectId
 │  ├─ ticker: String

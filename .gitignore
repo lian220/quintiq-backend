@@ -53,6 +53,9 @@ wheels/
 *.lock
 *.log
 
+# Claude Code
+.claude/settings.local.json
+
 # OS
 Thumbs.db
 .AppleDouble
@@ -71,6 +74,7 @@ gradle-app.setting
 !gradle-wrapper.jar
 !gradle-wrapper.properties
 *.hprof
+bin/
 
 # Kotlin
 *.kotlin_module
@@ -86,6 +90,7 @@ gradle-app.setting
 .env.test
 *.env
 !.env.sample
+.env-backups/
 
 # Credentials & Secrets
 credentials/
@@ -119,3 +124,10 @@ tmp/
 *.tmp
 *.bak
 *~.nib
+
+# Test files
+test_*.py
+**/src/scripts/
+
+# SQL scripts with credentials
+update_kis_credentials.sql
