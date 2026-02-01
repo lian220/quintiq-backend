@@ -25,15 +25,17 @@ docs/
 **⭐ 진행 상황 추적**
 - 📊 `문서_완성도_체크리스트.md` - 전체 문서 완성도 (35/50 완료, 70%)
 
-**주요 파일**
-- ✅ `Phase1_스펙.md` - 기본 인프라 구축 (완료)
-- ✅ `Phase2_스펙.md` - 데이터 엔진 통합 (완료)
+**주요 파일 (활성)**
 - 🔄 `Phase3_스펙.md` - 자동 매매 시스템 (진행 중 80%)
-- ✅ `Event_Driven_및_Job_아키텍처_TODO.md` - Event-Driven 구현 (완료)
 - 🔄 `스케줄러_마이그레이션_TODO.md` - 스케줄러 마이그레이션 (8/9 완료)
 - 📊 `분석_검증_체크리스트.md` - 분석 시스템 검증
 - 📈 `기능_로드맵.md` - 전체 기능 로드맵
 - 🗄️ `데이터베이스_마이그레이션_TODO.md` - DB 마이그레이션 (90% 완료)
+
+**완료된 항목 (legacy로 이동)**
+- ✅ `Phase1_스펙.md` - 기본 인프라 구축 → `legacy/todo/`
+- ✅ `Phase2_스펙.md` - 데이터 엔진 통합 → `legacy/todo/`
+- ✅ `Event_Driven_및_Job_아키텍처_TODO.md` - Event-Driven 구현 → `legacy/todo/`
 
 ---
 
@@ -41,14 +43,19 @@ docs/
 **시스템 설계 및 구조**
 
 **시스템 아키텍처**
-- `ARCHITECTURE.md` - 전체 시스템 아키텍처 개요
-- `시스템_아키텍처.md` - 상세 시스템 구조
-- `데이터베이스_설계.md` - PostgreSQL + MongoDB 하이브리드 설계
+- `시스템_아키텍처.md` - 전체 시스템 아키텍처 개요
+- `하이브리드_데이터베이스_전략.md` - PostgreSQL (정형) + MongoDB (비정형) 전략
+- `데이터베이스_마이그레이션_현황.md` - stocks 마이그레이션 현황 및 가이드
 
 **이벤트 기반 아키텍처**
 - `이벤트_기반_아키텍처.md` - Event-Driven Architecture 설계
 - `이벤트_스키마.md` - Kafka 이벤트 스키마 정의
 - `스케줄러_아키텍처.md` - Quartz Scheduler 구조
+
+**데이터베이스**
+- [database/](./database/) - PostgreSQL + MongoDB 상세 스키마
+  - `SCHEMA.md` - 전체 데이터베이스 스키마
+  - `RELATIONSHIPS.md` - 테이블/컬렉션 관계도
 
 **KIS API 연동**
 - `KIS_토큰_관리.md` - KIS 토큰 관리 시스템
@@ -106,9 +113,10 @@ docs/
 ---
 
 ### 📋 [가이드라인](./guidelines/)
-**개발 규칙 및 프로젝트 정보**
+**개발 규칙 및 문서 작성**
 - `PROJECT_OVERVIEW.md` - 프로젝트 개요
 - `CODE_STYLE.md` - 코드 스타일 가이드
+- `문서_작성_가이드.md` - 문서 작성 규칙 (구 CLAUDE.md)
 
 ---
 
@@ -189,28 +197,36 @@ docs/
 
 ## 📊 현재 구현 상태
 
-### ✅ 완료된 기능
-- ✅ Event-Driven Architecture (Kafka 기반)
-- ✅ PostgreSQL + MongoDB 하이브리드 DB
-- ✅ KIS API 연동 (해외주식)
-- ✅ 사용자별 KIS 계정 관리
-- ✅ Quartz Scheduler (8개 스케줄)
-- ✅ Slack 스레드 알림
-- ✅ 경제 데이터 수집 (FRED, Yahoo Finance)
-- ✅ 기술적 분석 (SMA, RSI, MACD)
-- ✅ 뉴스 감정 분석 (Alpha Vantage)
-- ✅ 통합 분석 및 자동 추천
+### ✅ 완료된 기능 (Phase 1-2)
+- ✅ **아키텍처**: Hexagonal Architecture + Event-Driven (Kafka)
+- ✅ **데이터베이스**: PostgreSQL (정형) + MongoDB (비정형) 하이브리드
+- ✅ **KIS API 연동**: 해외주식 거래 API 완전 통합
+- ✅ **사용자 관리**: 사용자별 KIS 계정 관리 시스템
+- ✅ **스케줄러**: Quartz Scheduler (9개 Job 구현)
+- ✅ **Slack 알림**: 스레드 기반 알림 + 날짜 정보 포함 (2026-02-01)
+- ✅ **Stock 마이그레이션**: MongoDB → PostgreSQL 완료 (2026-01-31)
 
-### 🔄 진행 중
-- 🔄 자동 매매 시스템 (8/9 완료)
-- 🔄 Vertex AI 예측 모델 통합
+### 🔄 진행 중 (Phase 3 - 80%)
+- ✅ **경제 데이터**: FRED, Yahoo Finance 수집 + 날짜 범위 지원 (2026-02-01)
+- ✅ **기술적 분석**: SMA, RSI, MACD 지표 계산
+- ✅ **감정 분석**: Alpha Vantage 뉴스 감정 분석
+- ✅ **AI 예측**: Vertex AI 예측 모델 통합 + 무조건 활성화 (2026-02-01)
+- ✅ **통합 분석**: 종합 분석 및 자동 추천 시스템
+- 🔄 **실시간 매도**: 매도 로직 고도화 진행 중
 
-### 🔜 예정
-- 🔜 실시간 시세 연동
-- 🔜 포트폴리오 최적화
-- 🔜 백테스팅 시스템
+### 🔜 예정 (Phase 4)
+- 🔜 **실시간 시세**: WebSocket 기반 실시간 시세 연동
+- 🔜 **포트폴리오 최적화**: 자산 배분 및 리밸런싱
+- 🔜 **백테스팅**: 전략 검증 시스템
+
+### 📈 최근 변경사항 (2026-02-01)
+1. **Slack 알림 개선**: 날짜 정보 추가 및 MongoDB URI 버그 수정
+2. **날짜 범위 기능**: 경제 데이터/분석 API 날짜 필터 추가
+3. **Vertex AI 설정**: GCP/Vertex AI 무조건 활성화
+4. **REST API 리팩토링**: 컨트롤러 구조 개편 완료
 
 ---
 
-**마지막 업데이트**: 2026-02-01
-**문서 버전**: 2.0
+**마지막 업데이트**: 2026-02-01 19:30 KST
+**문서 버전**: 2.1
+**Phase**: 3 진행 중 (80% 완료)

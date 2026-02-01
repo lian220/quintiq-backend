@@ -39,7 +39,8 @@
       "Bash(export GOOGLE_APPLICATION_CREDENTIALS=/Users/imdoyeong/Desktop/workSpace/quantiq/credentials/vertex-ai-key.json)",
       "Bash(xargs kill:*)",
       "Bash(python scripts/sync_from_prod_mongodb.py:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(grep초기)"
     ]
   }
 }

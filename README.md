@@ -276,25 +276,37 @@ mongosh -u quantiq_user -p quantiq_password
 ## 📞 문의 및 지원
 
 ### 문제 해결
-- **[로컬 테스트 가이드](./docs/setup/LOCAL_TEST_GUIDE.md)** - 테스트 방법
-- **[Slack 설정](./docs/setup/SLACK_SETUP_GUIDE.md)** - 알림 설정
+- **[로컬 테스트 가이드](./docs/setup/로컬_테스트_가이드.md)** - 테스트 방법
+- **[Slack 설정](./docs/setup/Slack_설정_가이드.md)** - 알림 설정
 
 ### 개발 진행 상황
-- **Phase 1**: ✅ 기본 인프라 구축 완료
+- **Phase 1**: ✅ 기본 인프라 구축 완료 (2026-01-29)
 - **Phase 2**: ✅ Event-Driven Architecture 구축 완료 (2026-01-31)
-- **Phase 2.5**: 🔄 Job-based 아키텍처 전환 계획 중 (리소스 최적화)
-- **Phase 3**: 🔜 자동 매매 시스템 고도화 예정
+- **Phase 3**: 🔄 자동 매매 시스템 구현 중 (80% 완료)
+  - ✅ 경제 데이터 수집 (FRED, Yahoo Finance)
+  - ✅ 기술적 분석 (SMA, RSI, MACD)
+  - ✅ 감정 분석 (Alpha Vantage)
+  - ✅ Vertex AI 예측 모델 통합
+  - ✅ Slack 알림 (날짜 정보 포함)
+  - 🔄 실시간 매도 로직 개선 중
 
-### 최근 업데이트
-- ✅ **2026-01-31**: Hexagonal Architecture + Event-Driven 구현
-  - **Quantiq Core**: Hexagonal Architecture (Ports & Adapters) 적용
-  - **Data Engine**: Feature-based Clean Architecture 적용
-  - Kafka 기반 이벤트 스트리밍
-  - 테스트 용이성 및 프레임워크 독립성 확보
-  - 명확한 계층 분리로 유지보수성 향상
+### 최근 업데이트 (2026-02-01)
+- ✅ **Slack 알림 개선**: 날짜 정보 추가, MongoDB URI 버그 수정
+- ✅ **날짜 범위 기능**: 경제 데이터 및 분석 API에 날짜 범위 지원
+- ✅ **Vertex AI**: GCP/Vertex AI 무조건 활성화 설정
+- ✅ **REST API 구조 개편**: 컨트롤러 리팩토링 완료
+- ✅ **Stock 마이그레이션**: MongoDB → PostgreSQL 전환 완료
+
+### 아키텍처 특징 (2026-01-31 구현)
+- **Quantiq Core (Kotlin)**: Hexagonal Architecture (Ports & Adapters)
+- **Data Engine (Python)**: Feature-based Clean Architecture
+- **통신**: Kafka 기반 Event-Driven Architecture
+- **데이터베이스**: PostgreSQL (정형) + MongoDB (비정형) 하이브리드
+- **테스트 용이성**: Port 인터페이스 기반 독립적 테스트
+- **프레임워크 독립성**: 비즈니스 로직이 Spring에 의존하지 않음
 
 ---
 
-**마지막 업데이트**: 2026-01-31
-**상태**: ✅ Phase 1 완료, Phase 2 진행 중
+**마지막 업데이트**: 2026-02-01
+**현재 단계**: Phase 3 진행 중 (80% 완료)
 **관리자**: Quantiq Development Team
