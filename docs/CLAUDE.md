@@ -193,29 +193,11 @@ docker-compose up -d  # 인프라 시작
 
 ### 문서 이동 규칙
 
-**적절한 디렉토리로 이동:**
-```bash
-# 환경 설정 관련 문서 → setup/
-git mv docs/환경변수_관리_가이드.md docs/setup/
-
-# KIS API 관련 문서 → kis/
-git mv docs/사용자_KIS_계정_가이드.md docs/kis/
-
-# 아키텍처 관련 문서 → architecture/
-git mv docs/시스템_설계.md docs/architecture/
-```
-
 **레거시 문서 처리:**
 ```bash
 # MongoDB 기반 → PostgreSQL 기반으로 전환 시
-git mv docs/architecture/MongoDB_설계.md docs/legacy/
+mv docs/architecture/MongoDB_설계.md docs/legacy/
 ```
-
-**문서 이동 후 필수 작업:**
-1. `docs/README.md`에서 링크 업데이트
-2. `docs/todo/문서_완성도_체크리스트.md`에서 경로 수정
-3. 다른 문서에서 참조하는 링크 모두 업데이트
-4. 상대 경로 확인 및 수정
 
 **새 버전 작성:**
 - 구버전 삭제 금지 (legacy로 이동)

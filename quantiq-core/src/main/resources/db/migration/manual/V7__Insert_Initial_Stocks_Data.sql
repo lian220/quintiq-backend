@@ -1,6 +1,7 @@
 -- ============================================
 -- Stock 초기 데이터
 -- 자동 생성됨: 2026-02-01
+-- ⚠️ 중복 방지: ON CONFLICT DO NOTHING 사용
 -- ============================================
 
 INSERT INTO stocks (ticker, stock_name, stock_name_en, is_etf, leverage_ticker, exchange, sector, industry, is_active)
@@ -39,6 +40,8 @@ VALUES
     ('TXN', '텍사스 인스트루먼트', NULL, FALSE, NULL, NULL, NULL, NULL, TRUE),
     ('VRT', '버티브 홀딩스', NULL, FALSE, 'VRTL', NULL, NULL, NULL, TRUE),
     ('VST', '비스트라 에너지', NULL, FALSE, 'VSTL', NULL, NULL, NULL, TRUE),
-    ('WMT', '월마트', NULL, FALSE, NULL, NULL, NULL, NULL, TRUE);
+    ('WMT', '월마트', NULL, FALSE, NULL, NULL, NULL, NULL, TRUE)
+ON CONFLICT (ticker) DO NOTHING;
 
 -- Total: 35 stocks
+-- ✅ 중복 방지: ticker가 이미 존재하면 무시

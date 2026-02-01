@@ -1,3 +1,9 @@
+# ============================================
+# Server Configuration
+# ============================================
+server:
+  port: ${SERVER_PORT:10010}
+
 spring:
   application:
     name: quantiq-core
@@ -131,6 +137,10 @@ springdoc:
     display-request-duration: true
     disable-swagger-default-url: true
   show-actuator: false
+  # 올바른 서버 URL 설정 (포트 10010)
+  servers:
+    - url: http://localhost:10010
+      description: Local Development Server
 
 # ============================================
 # Slack Configuration
@@ -151,7 +161,7 @@ slack:
 # Google Cloud Configuration
 # ============================================
 gcp:
-  enabled: ${GCP_ENABLED:false}
+  enabled: ${GCP_ENABLED:true}
   project-id: ${GCP_PROJECT_ID:}
   region: ${GCP_REGION:us-central1}
   credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}

@@ -31,7 +31,13 @@
       "Bash(git mv:*)",
       "Bash(tree:*)",
       "Bash(__NEW_LINE_ad284566c8d145fa__ echo \"=== 📁 docs/architecture/ ===\")",
-      "Bash(__NEW_LINE_ad284566c8d145fa__ echo \"\")"
+      "Bash(__NEW_LINE_ad284566c8d145fa__ echo \"\")",
+      "Bash(GCP_ENABLED=false ./gradlew bootRun:*)",
+      "Bash(PGPASSWORD=quantiq psql:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(export GOOGLE_APPLICATION_CREDENTIALS=/Users/imdoyeong/Desktop/workSpace/quantiq/credentials/vertex-ai-key.json)",
+      "Bash(xargs kill:*)"
     ]
   }
 }

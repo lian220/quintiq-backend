@@ -139,6 +139,10 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL_SCHEDULER}
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       SLACK_CHANNEL: "C0A1XASTLH2"
+      # Google Cloud (override .env.local path for container)
+      GOOGLE_APPLICATION_CREDENTIALS: "/app/credentials/vertex-ai-key.json"
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-arboreal-path-479202-c5}
+      GCP_REGION: ${GCP_REGION:-us-central1}
     volumes:
       - ./quantiq-data-engine:/app
       - ./credentials:/app/credentials
@@ -158,7 +162,7 @@ services:
       dockerfile: Dockerfile
     container_name: quantiq-core
     ports:
-      - "10010:8080"
+      - "10010:10010"
     depends_on:
       postgresql:
         condition: service_healthy
@@ -197,6 +201,8 @@ services:
       DB_DUAL_WRITE: "true"
       DB_READ_SOURCE: "rdb"
       RUN_MIGRATION: "true"
+      # Google Cloud (override .env.local path for container)
+      GOOGLE_APPLICATION_CREDENTIALS: "/app/credentials/vertex-ai-key.json"
       # JVM Heap Settings
       JAVA_OPTS: "-Xmx768m -Xms512m -XX:MaxMetaspaceSize=256m"
     deploy:
