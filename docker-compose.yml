@@ -175,6 +175,7 @@ services:
     volumes:
       - ./credentials:/app/credentials
       - ./quantiq-data-engine:/quantiq-data-engine
+      - ./.env.prod:/app/.env.prod:ro
     environment:
       TZ: "Asia/Seoul"
       # PostgreSQL

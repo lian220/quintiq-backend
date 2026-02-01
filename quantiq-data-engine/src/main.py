@@ -195,17 +195,19 @@ def main():
                     payload = message.get("payload", message)
                     request_id = payload.get("requestId", "unknown")
                     thread_ts = payload.get("threadTs")  # Kotlin에서 전달받은 스레드 타임스탬프
+                    target_date = payload.get("targetDate")  # 분석 기준 날짜
 
                     logger.info("=" * 80)
                     logger.info("기술적 분석 요청 Kafka 메시지 수신")
                     logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Target Date: {target_date or '당일'}")
                     logger.info(f"Thread TS: {thread_ts}")
                     logger.info("=" * 80)
 
                     start_time = time.time()
                     try:
                         # Service 호출
-                        result = recommendation_service.run_technical_analysis(request_id, thread_ts)
+                        result = recommendation_service.run_technical_analysis(request_id, thread_ts, target_date)
                         elapsed_time = time.time() - start_time
 
                         logger.info("✅ 기술적 분석 완료")
@@ -267,16 +269,18 @@ def main():
                     payload = message.get("payload", message)
                     request_id = payload.get("requestId", "unknown")
                     thread_ts = payload.get("threadTs")
+                    target_date = payload.get("targetDate")  # 분석 기준 날짜
 
                     logger.info("=" * 80)
                     logger.info("통합 분석 요청 Kafka 메시지 수신")
                     logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Target Date: {target_date or '당일'}")
                     logger.info(f"Thread TS: {thread_ts}")
                     logger.info("=" * 80)
 
                     start_time = time.time()
                     try:
-                        result = recommendation_service.run_combined_analysis(request_id, thread_ts)
+                        result = recommendation_service.run_combined_analysis(request_id, thread_ts, target_date)
                         elapsed_time = time.time() - start_time
 
                         logger.info("✅ 통합 분석 완료")

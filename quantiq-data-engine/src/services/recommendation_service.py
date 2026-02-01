@@ -22,19 +22,20 @@ class RecommendationService:
         self.technical_service = TechnicalAnalysisService()
         self.sentiment_service = SentimentAnalysisService()
 
-    def run_technical_analysis(self, request_id: str, thread_ts: str = None) -> Dict[str, Any]:
+    def run_technical_analysis(self, request_id: str, thread_ts: str = None, target_date: str = None) -> Dict[str, Any]:
         """
         기술적 분석 전체 플로우
 
         Args:
             request_id: 요청 ID
             thread_ts: Slack 스레드 타임스탬프
+            target_date: 분석 기준 날짜 (YYYY-MM-DD)
 
         Returns:
             분석 결과
         """
         try:
-            logger.info(f"[{request_id}] 기술적 분석 시작")
+            logger.info(f"[{request_id}] 기술적 분석 시작 (target_date={target_date})")
 
             # 시작 알림
             if thread_ts:
@@ -44,7 +45,7 @@ class RecommendationService:
                 )
 
             # 분석 실행
-            results = self.technical_service.analyze_stocks()
+            results = self.technical_service.analyze_stocks(target_date=target_date)
 
             # 추천 종목 필터링
             recommended = [r for r in results if r.get("is_recommended", False)]
@@ -142,7 +143,7 @@ class RecommendationService:
                 "error": str(e)
             }
 
-    def run_combined_analysis(self, request_id: str, thread_ts: str = None) -> Dict[str, Any]:
+    def run_combined_analysis(self, request_id: str, thread_ts: str = None, target_date: str = None) -> Dict[str, Any]:
         """
         통합 분석 (3단계)
         1. 기술적 분석
@@ -152,12 +153,13 @@ class RecommendationService:
         Args:
             request_id: 요청 ID
             thread_ts: Slack 스레드 타임스탬프
+            target_date: 분석 기준 날짜 (YYYY-MM-DD)
 
         Returns:
             통합 분석 결과
         """
         try:
-            logger.info(f"[{request_id}] 통합 분석 시작")
+            logger.info(f"[{request_id}] 통합 분석 시작 (target_date={target_date})")
 
             # 1단계: 기술적 분석
             if thread_ts:
@@ -166,7 +168,7 @@ class RecommendationService:
                     thread_ts
                 )
 
-            tech_results = self.technical_service.analyze_stocks()
+            tech_results = self.technical_service.analyze_stocks(target_date=target_date)
             tech_recommended = [r for r in tech_results if r.get("is_recommended", False)]
 
             logger.info(f"[{request_id}] 1단계 완료: 기술적 분석 {len(tech_recommended)}개 추천")
@@ -182,12 +184,12 @@ class RecommendationService:
             sentiment_results = self.sentiment_service.fetch_and_store_sentiment()
             avg_sentiment = sum(r.get("average_sentiment_score", 0) for r in sentiment_results) / len(sentiment_results) if sentiment_results else 0
 
-            logger.info(f"[{request_id}] 2단계 완료: 감정 분석 {len(sentiment_results)}개, 평균 {avg_sentiment:.2f}")
+            logger.info(f"[{request_id}] 2단계 완료: 감정 분석 {len(sentiment_results)}개 종목")
 
             # 3단계: 통합 점수 계산
             if thread_ts:
                 SlackNotifier.send_thread_message(
-                    f"✅ 2단계 완료: 평균 감정 점수 {avg_sentiment:.2f}\n"
+                    f"✅ 2단계 완료: {len(sentiment_results)}개 분석\n"
                     f"🔄 3단계: 통합 점수 계산 중...",
                     thread_ts
                 )
@@ -266,8 +268,11 @@ class RecommendationService:
             sentiment_score = sentiment_map.get(ticker, 0)
             sentiment_normalized = (sentiment_score + 1) / 2.0
 
-            # 가중 평균 (기술적 70%, 감정 30%)
-            combined_score = (technical_score * 0.7) + (sentiment_normalized * 0.3)
+            # 가중 평균 (sentiment 없으면 technical 100%, 있으면 기술적 70% + 감정 30%)
+            if sentiment_results:
+                combined_score = (technical_score * 0.7) + (sentiment_normalized * 0.3)
+            else:
+                combined_score = technical_score  # sentiment 비활성화 시 technical만 사용
 
             combined.append({
                 "ticker": ticker,

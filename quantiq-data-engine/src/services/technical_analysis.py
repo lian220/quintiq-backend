@@ -30,10 +30,10 @@ class TechnicalAnalysisService:
         signal = macd.ewm(span=signal_period, adjust=False).mean()
         return macd, signal
 
-    def analyze_stocks(self, start_date=None, end_date=None):
-        logger.info("Starting technical analysis...")
+    def analyze_stocks(self, target_date=None):
+        logger.info(f"Starting technical analysis (target_date={target_date})...")
         db = MongoDB.get_db()
-        
+
         # Get active stocks
         stock_names = []
         try:
@@ -47,15 +47,21 @@ class TechnicalAnalysisService:
             logger.warning("No active stocks found for analysis.")
             return []
 
-        # Determine date range
-        if not (start_date and end_date):
+        # Determine date range based on target_date
+        if target_date:
+            # Parse target_date and fetch lookback_days before it
+            target_dt = datetime.strptime(target_date, "%Y-%m-%d")
+            start_dt = target_dt - timedelta(days=self.lookback_days)
+            start_date_str = start_dt.strftime("%Y-%m-%d")
+            end_date_str = target_date
+            analysis_date = target_date
+        else:
+            # No target_date specified, use current date
             end_dt = datetime.now()
             start_dt = end_dt - timedelta(days=self.lookback_days)
             start_date_str = start_dt.strftime("%Y-%m-%d")
             end_date_str = end_dt.strftime("%Y-%m-%d")
-        else:
-            start_date_str = start_date
-            end_date_str = end_date
+            analysis_date = end_date_str
 
         # Fetch daily data
         try:
@@ -105,9 +111,18 @@ class TechnicalAnalysisService:
                 df['sma50'] = self.calculate_sma(df['close'], 50)
                 df['rsi'] = self.calculate_rsi(df['close'])
                 df['macd'], df['signal'] = self.calculate_macd(df['close'])
-                
-                latest_date = df.index[-1]
-                latest_row = df.loc[latest_date]
+
+                # Use target_date for analysis (not the latest date)
+                try:
+                    target_dt = pd.to_datetime(analysis_date)
+                    if target_dt not in df.index:
+                        logger.warning(f"Target date {analysis_date} not found for {ticker}, skipping")
+                        continue
+                    latest_date = target_dt
+                    latest_row = df.loc[latest_date]
+                except Exception as e:
+                    logger.error(f"Error accessing target date {analysis_date} for {ticker}: {e}")
+                    continue
                 
                 golden_cross = latest_row['sma20'] > latest_row['sma50']
                 macd_buy = latest_row['macd'] > latest_row['signal']

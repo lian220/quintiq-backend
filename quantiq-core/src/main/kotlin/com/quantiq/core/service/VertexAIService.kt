@@ -161,8 +161,8 @@ class VertexAIService(
 
     /**
      * 환경 변수 빌드
-     * MongoDB 환경변수를 .env.prod 파일에서 읽어서 Vertex AI Job에 전달
-     * Slack threadTs도 환경변수로 전달
+     * ⚠️ VERTEX AI 전용: 무조건 .env.prod 파일만 사용
+     * Spring 설정은 절대 사용하지 않음 (로컬 MongoDB 방지)
      */
     private fun buildEnvironmentVariables(threadTs: String?): Map<String, String> {
         val envVars = mutableMapOf(
@@ -179,82 +179,40 @@ class VertexAIService(
             logger.info("SLACK_THREAD_TS 환경변수 추가됨: $it")
         }
 
-        // .env.prod 파일에서 MongoDB 환경변수 로드 시도
+        // ⚠️ CRITICAL: .env.prod 파일에서만 MongoDB 환경변수 로드
+        logger.info("=" .repeat(60))
+        logger.info("⚠️ VERTEX AI 전용: .env.prod 파일만 사용")
+        logger.info("=" .repeat(60))
+
         val envFile = loadEnvFile()
 
-        // MongoDB 환경변수 추가 (우선순위: .env.prod > Spring 설정)
-        var mongoUrlSet = false
-        var mongoUserSet = false
-        var mongoPasswordSet = false
-        var mongoDatabaseSet = false
-
-        // 1. .env.prod 파일에서 읽기 시도
-        envFile["MONGO_URL"]?.let {
-            envVars["MONGO_URL"] = it
-            mongoUrlSet = true
-            logger.info("✅ MONGO_URL 환경변수 추가됨 (.env.prod)")
-        }
-        envFile["MONGO_USER"]?.let {
-            envVars["MONGO_USER"] = it
-            mongoUserSet = true
-            logger.info("✅ MONGO_USER 환경변수 추가됨 (.env.prod)")
-        }
-        envFile["MONGO_PASSWORD"]?.let {
-            envVars["MONGO_PASSWORD"] = it
-            mongoPasswordSet = true
-            logger.info("✅ MONGO_PASSWORD 환경변수 추가됨 (.env.prod) (***)")
-        }
-        envFile["MONGODB_DATABASE"]?.let {
-            envVars["MONGODB_DATABASE"] = it
-            mongoDatabaseSet = true
-            logger.info("✅ MONGODB_DATABASE 환경변수 추가됨 (.env.prod): $it")
+        if (envFile.isEmpty()) {
+            logger.error("❌ .env.prod 파일을 읽을 수 없습니다!")
+            throw IllegalStateException(".env.prod 파일을 찾을 수 없거나 비어있습니다. Vertex AI 실행 불가.")
         }
 
-        // 2. .env.prod에서 못 읽었으면 Spring 설정에서 파싱
-        if (!mongoUrlSet || !mongoUserSet || !mongoPasswordSet) {
-            logger.warn("⚠️ .env.prod에서 MongoDB 환경변수를 찾지 못했습니다. Spring 설정에서 파싱 시도...")
-            logger.info("MongoDB URI from Spring: ${maskPassword(mongodbUri)}")
+        // MongoDB 필수 환경변수 로드 (.env.prod에서만)
+        val mongoUrl = envFile["MONGO_URL"]
+            ?: throw IllegalStateException("❌ .env.prod에 MONGO_URL이 없습니다!")
 
-            try {
-                val parsed = parseMongoDbUri(mongodbUri)
+        val mongoUser = envFile["MONGO_USER"]
+            ?: throw IllegalStateException("❌ .env.prod에 MONGO_USER가 없습니다!")
 
-                if (!mongoUrlSet && parsed.host.isNotEmpty()) {
-                    // mongodb:// 또는 mongodb+srv:// 프로토콜과 함께 재구성
-                    val protocol = if (parsed.isSrv) "mongodb+srv" else "mongodb"
-                    val mongoUrl = if (parsed.username.isNotEmpty() && parsed.password.isNotEmpty()) {
-                        "$protocol://${parsed.username}:${parsed.password}@${parsed.host}"
-                    } else {
-                        "$protocol://${parsed.host}"
-                    }
-                    envVars["MONGO_URL"] = mongoUrl
-                    logger.info("✅ MONGO_URL 환경변수 추가됨 (Spring 설정): $protocol://${parsed.host}")
-                    mongoUrlSet = true
-                }
-                if (!mongoUserSet && parsed.username.isNotEmpty()) {
-                    envVars["MONGO_USER"] = parsed.username
-                    logger.info("✅ MONGO_USER 환경변수 추가됨 (Spring 설정): ${parsed.username}")
-                    mongoUserSet = true
-                }
-                if (!mongoPasswordSet && parsed.password.isNotEmpty()) {
-                    envVars["MONGO_PASSWORD"] = parsed.password
-                    logger.info("✅ MONGO_PASSWORD 환경변수 추가됨 (Spring 설정) (***)")
-                    mongoPasswordSet = true
-                }
-                if (!mongoDatabaseSet && parsed.database.isNotEmpty()) {
-                    envVars["MONGODB_DATABASE"] = parsed.database
-                    logger.info("✅ MONGODB_DATABASE 환경변수 추가됨 (Spring 설정): ${parsed.database}")
-                    mongoDatabaseSet = true
-                }
-            } catch (e: Exception) {
-                logger.error("❌ MongoDB URI 파싱 실패: ${e.message}", e)
-            }
-        }
+        val mongoPassword = envFile["MONGO_PASSWORD"]
+            ?: throw IllegalStateException("❌ .env.prod에 MONGO_PASSWORD가 없습니다!")
 
-        // 3. 필수 환경변수 검증
-        if (!mongoUrlSet) {
-            logger.error("❌ MONGO_URL 환경변수를 설정할 수 없습니다!")
-            throw IllegalStateException("MONGO_URL 환경변수가 설정되지 않았습니다. .env.prod 또는 Spring 설정을 확인하세요.")
-        }
+        val mongoDatabase = envFile["MONGODB_DATABASE"] ?: "stock_trading"
+
+        // 환경변수 추가
+        envVars["MONGO_URL"] = mongoUrl
+        envVars["MONGO_USER"] = mongoUser
+        envVars["MONGO_PASSWORD"] = mongoPassword
+        envVars["MONGODB_DATABASE"] = mongoDatabase
+
+        logger.info("✅ MONGO_URL: $mongoUrl")
+        logger.info("✅ MONGO_USER: $mongoUser")
+        logger.info("✅ MONGO_PASSWORD: ***")
+        logger.info("✅ MONGODB_DATABASE: $mongoDatabase")
 
         // Slack 환경변수 추가
         envFile["SLACK_BOT_TOKEN"]?.let {
@@ -268,10 +226,6 @@ class VertexAIService(
 
         logger.info("=" .repeat(60))
         logger.info("📋 총 환경 변수 ${envVars.size}개 설정 완료")
-        logger.info("  - MONGO_URL: ${if (mongoUrlSet) "✅" else "❌"}")
-        logger.info("  - MONGO_USER: ${if (mongoUserSet) "✅" else "❌"}")
-        logger.info("  - MONGO_PASSWORD: ${if (mongoPasswordSet) "✅" else "❌"}")
-        logger.info("  - MONGODB_DATABASE: ${if (mongoDatabaseSet) "✅ (${envVars["MONGODB_DATABASE"]})" else "❌"}")
         logger.info("=" .repeat(60))
 
         return envVars
