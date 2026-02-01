@@ -33,7 +33,7 @@ class AnalysisManagementService(
 
             // Slack 알림 전송 먼저 (스레드 루트 메시지 생성 → threadTs 반환)
             val threadTs = try {
-                notificationSender.notifyTechnicalAnalysisRequest(requestId)
+                notificationSender.notifyTechnicalAnalysisRequest(requestId, targetDate)
             } catch (e: Exception) {
                 logger.warn("Slack 알림 전송 실패: ${e.message}")
                 null
@@ -81,7 +81,7 @@ class AnalysisManagementService(
 
             // Slack 알림 전송 먼저 (스레드 루트 메시지 생성 → threadTs 반환)
             val threadTs = try {
-                notificationSender.notifySentimentAnalysisRequest(requestId)
+                notificationSender.notifySentimentAnalysisRequest(requestId, targetDate)
             } catch (e: Exception) {
                 logger.warn("Slack 알림 전송 실패: ${e.message}")
                 null
@@ -129,7 +129,7 @@ class AnalysisManagementService(
 
             // Slack 알림 전송 먼저 (스레드 루트 메시지 생성 → threadTs 반환)
             val threadTs = try {
-                notificationSender.notifyCombinedAnalysisRequest(requestId)
+                notificationSender.notifyCombinedAnalysisRequest(requestId, targetDate)
             } catch (slackError: Exception) {
                 logger.warn("Slack 알림 전송 실패: ${slackError.message}")
                 null

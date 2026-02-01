@@ -35,7 +35,7 @@ class EconomicDataManagementService(
 
             // Slack 알림 전송 먼저 (스레드 루트 메시지 생성 → threadTs 반환)
             val threadTs = try {
-                notificationSender.notifyEconomicDataUpdateRequest(requestId)
+                notificationSender.notifyEconomicDataUpdateRequest(requestId, targetDate)
             } catch (e: Exception) {
                 logger.warn("Slack 알림 전송 실패: ${e.message}")
                 null

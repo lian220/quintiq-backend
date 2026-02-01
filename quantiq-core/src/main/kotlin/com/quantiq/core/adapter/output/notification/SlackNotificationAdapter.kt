@@ -13,24 +13,24 @@ class SlackNotificationAdapter(
     private val slackApiClient: SlackApiClient
 ) : NotificationSender {
 
-    override fun notifyEconomicDataUpdateRequest(requestId: String): String? {
-        return slackApiClient.notifyEconomicDataUpdateRequest(requestId)
+    override fun notifyEconomicDataUpdateRequest(requestId: String, targetDate: String?): String? {
+        return slackApiClient.notifyEconomicDataUpdateRequest(requestId, targetDate)
     }
 
     override fun notifyEconomicDataCollectionError(requestId: String, error: String) {
         slackApiClient.notifyEconomicDataCollectionError(requestId, error)
     }
 
-    override fun notifyTechnicalAnalysisRequest(requestId: String): String? {
-        return slackApiClient.notifyTechnicalAnalysisRequest(requestId)
+    override fun notifyTechnicalAnalysisRequest(requestId: String, targetDate: String?): String? {
+        return slackApiClient.notifyTechnicalAnalysisRequest(requestId, targetDate)
     }
 
-    override fun notifySentimentAnalysisRequest(requestId: String): String? {
-        return slackApiClient.notifySentimentAnalysisRequest(requestId)
+    override fun notifySentimentAnalysisRequest(requestId: String, targetDate: String?): String? {
+        return slackApiClient.notifySentimentAnalysisRequest(requestId, targetDate)
     }
 
-    override fun notifyCombinedAnalysisRequest(requestId: String): String? {
-        return slackApiClient.notifyCombinedAnalysisRequest(requestId)
+    override fun notifyCombinedAnalysisRequest(requestId: String, targetDate: String?): String? {
+        return slackApiClient.notifyCombinedAnalysisRequest(requestId, targetDate)
     }
 
     override fun notifyAnalysisError(requestId: String, analysisType: String, error: String) {

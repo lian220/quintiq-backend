@@ -219,8 +219,15 @@ class VertexAIService(
                 val parsed = parseMongoDbUri(mongodbUri)
 
                 if (!mongoUrlSet && parsed.host.isNotEmpty()) {
-                    envVars["MONGO_URL"] = parsed.host
-                    logger.info("✅ MONGO_URL 환경변수 추가됨 (Spring 설정): ${parsed.host}")
+                    // mongodb:// 또는 mongodb+srv:// 프로토콜과 함께 재구성
+                    val protocol = if (parsed.isSrv) "mongodb+srv" else "mongodb"
+                    val mongoUrl = if (parsed.username.isNotEmpty() && parsed.password.isNotEmpty()) {
+                        "$protocol://${parsed.username}:${parsed.password}@${parsed.host}"
+                    } else {
+                        "$protocol://${parsed.host}"
+                    }
+                    envVars["MONGO_URL"] = mongoUrl
+                    logger.info("✅ MONGO_URL 환경변수 추가됨 (Spring 설정): $protocol://${parsed.host}")
                     mongoUrlSet = true
                 }
                 if (!mongoUserSet && parsed.username.isNotEmpty()) {
@@ -279,11 +286,13 @@ class VertexAIService(
         val host: String,
         val username: String,
         val password: String,
-        val database: String
+        val database: String,
+        val isSrv: Boolean = false
     )
 
     private fun parseMongoDbUri(uri: String): MongoDbUriParts {
         // mongodb:// 또는 mongodb+srv:// 제거
+        val isSrv = uri.startsWith("mongodb+srv://")
         val cleanUri = uri.removePrefix("mongodb://").removePrefix("mongodb+srv://")
 
         var username = ""
@@ -308,6 +317,13 @@ class VertexAIService(
             val hostAndDb = hostPart.split("?")[0] // 옵션 제거
             val hostDbParts = hostAndDb.split("/")
             host = hostDbParts[0]
+
+            // mongodb+srv:// 프로토콜은 포트를 포함할 수 없으므로 포트 제거
+            if (isSrv && ":" in host) {
+                host = host.substringBefore(":")
+                logger.warn("⚠️ mongodb+srv:// URI에서 포트 번호 제거됨: $host")
+            }
+
             if (hostDbParts.size > 1 && hostDbParts[1].isNotEmpty()) {
                 database = hostDbParts[1]
             }
@@ -316,12 +332,19 @@ class VertexAIService(
             val hostAndDb = cleanUri.split("?")[0]
             val hostDbParts = hostAndDb.split("/")
             host = hostDbParts[0]
+
+            // mongodb+srv:// 프로토콜은 포트를 포함할 수 없으므로 포트 제거
+            if (isSrv && ":" in host) {
+                host = host.substringBefore(":")
+                logger.warn("⚠️ mongodb+srv:// URI에서 포트 번호 제거됨: $host")
+            }
+
             if (hostDbParts.size > 1 && hostDbParts[1].isNotEmpty()) {
                 database = hostDbParts[1]
             }
         }
 
-        return MongoDbUriParts(host, username, password, database)
+        return MongoDbUriParts(host, username, password, database, isSrv)
     }
 
     /**
