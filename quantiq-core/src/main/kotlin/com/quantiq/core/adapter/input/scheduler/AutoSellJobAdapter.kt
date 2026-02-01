@@ -27,7 +27,6 @@ class AutoSellJobAdapter : Job {
         try {
             // 미국 시장 시간 검증
             if (!isUsMarketHours()) {
-                logger.debug("⏸️ 미국 시장 시간이 아닙니다. 매도 체크 건너뜀")
                 return
             }
 
