@@ -1,4 +1,4 @@
-package com.quantiq.core.adapter.input.rest
+package com.quantiq.core.adapter.input.rest.economic
 
 import com.quantiq.core.domain.economic.port.input.EconomicDataUseCase
 import io.swagger.v3.oas.annotations.Operation
@@ -16,13 +16,13 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
 /**
- * 경제 데이터 업데이트 REST Controller (Input Adapter)
+ * 경제 데이터 수집 Controller (Input Adapter)
  * HTTP 요청을 UseCase로 전달하는 Adapter 역할을 합니다.
  */
 @Tag(name = "Economic Data", description = "경제 데이터 수집 API - FRED, Yahoo Finance")
 @RestController
-@RequestMapping("/api/economic")
-class EconomicDataRestController(
+@RequestMapping("/api/v1/economic-data")
+class EconomicDataController(
     private val economicDataUseCase: EconomicDataUseCase
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -69,8 +69,8 @@ class EconomicDataRestController(
             )
         ]
     )
-    @PostMapping("/trigger-update")
-    fun triggerEconomicDataUpdate(): ResponseEntity<Map<String, Any>> {
+    @PostMapping("/collections")
+    fun collectEconomicData(): ResponseEntity<Map<String, Any>> {
         return try {
             logger.info("경제 데이터 업데이트 수동 트리거 요청 받음")
 

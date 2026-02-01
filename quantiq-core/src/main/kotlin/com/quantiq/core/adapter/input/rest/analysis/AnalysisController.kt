@@ -1,4 +1,4 @@
-package com.quantiq.core.adapter.input.rest
+package com.quantiq.core.adapter.input.rest.analysis
 
 import com.quantiq.core.domain.analysis.port.input.AnalysisUseCase
 import io.swagger.v3.oas.annotations.Operation
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
 /**
- * 분석 REST Controller (Input Adapter)
+ * 분석 Controller (Input Adapter)
  * HTTP 요청을 AnalysisUseCase로 전달하는 Adapter 역할을 합니다.
  *
  * 지원하는 분석 유형:
@@ -27,8 +27,8 @@ import java.time.Instant
  */
 @Tag(name = "Analysis", description = "주식 분석 API - 기술적 분석, 감정 분석, 통합 분석")
 @RestController
-@RequestMapping("/api/analysis")
-class AnalysisRestController(
+@RequestMapping("/api/v1/analyses")
+class AnalysisController(
     private val analysisUseCase: AnalysisUseCase
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
@@ -83,8 +83,8 @@ class AnalysisRestController(
             )
         ]
     )
-    @PostMapping("/trigger-technical")
-    fun triggerTechnicalAnalysis(): ResponseEntity<Map<String, Any>> {
+    @PostMapping("/technical")
+    fun executeTechnicalAnalysis(): ResponseEntity<Map<String, Any>> {
         return try {
             logger.info("기술적 분석 수동 트리거 요청 받음")
 
@@ -136,8 +136,8 @@ class AnalysisRestController(
             ApiResponse(responseCode = "500", description = "분석 요청 실패")
         ]
     )
-    @PostMapping("/trigger-sentiment")
-    fun triggerSentimentAnalysis(): ResponseEntity<Map<String, Any>> {
+    @PostMapping("/sentiment")
+    fun executeSentimentAnalysis(): ResponseEntity<Map<String, Any>> {
         return try {
             logger.info("감정 분석 수동 트리거 요청 받음")
 
@@ -191,8 +191,8 @@ class AnalysisRestController(
             ApiResponse(responseCode = "500", description = "통합 분석 요청 실패")
         ]
     )
-    @PostMapping("/trigger-combined")
-    fun triggerCombinedAnalysis(): ResponseEntity<Map<String, Any>> {
+    @PostMapping("/combined")
+    fun executeCombinedAnalysis(): ResponseEntity<Map<String, Any>> {
         return try {
             logger.info("통합 분석 수동 트리거 요청 받음")
 
@@ -226,8 +226,8 @@ class AnalysisRestController(
             기술적 분석과 감정 분석을 동시에 실행합니다.
 
             **차이점:**
-            - /trigger-combined: 순차 실행 (1단계 → 2단계 → 3단계)
-            - /trigger-parallel: 동시 실행 (기술적 || 감정)
+            - /combined: 순차 실행 (1단계 → 2단계 → 3단계)
+            - /parallel: 동시 실행 (기술적 || 감정)
 
             **장점:**
             - 실행 시간 단축 (약 50% 절감)
@@ -240,8 +240,8 @@ class AnalysisRestController(
             ApiResponse(responseCode = "500", description = "병렬 분석 요청 실패")
         ]
     )
-    @PostMapping("/trigger-parallel")
-    fun triggerParallelAnalysis(): ResponseEntity<Map<String, Any>> {
+    @PostMapping("/parallel")
+    fun executeParallelAnalysis(): ResponseEntity<Map<String, Any>> {
         return try {
             logger.info("병렬 분석 수동 트리거 요청 받음")
 
@@ -316,11 +316,11 @@ class AnalysisRestController(
                         )
                     ),
                     "availableEndpoints" to listOf(
-                        "POST /api/analysis/trigger-technical - 기술적 분석만 실행",
-                        "POST /api/analysis/trigger-sentiment - 감정 분석만 실행",
-                        "POST /api/analysis/trigger-combined - 통합 분석 실행 (순차)",
-                        "POST /api/analysis/trigger-parallel - 병렬 분석 실행 (동시)",
-                        "GET  /api/analysis/status - 상태 조회"
+                        "POST /api/v1/analyses/technical - 기술적 분석만 실행",
+                        "POST /api/v1/analyses/sentiment - 감정 분석만 실행",
+                        "POST /api/v1/analyses/combined - 통합 분석 실행 (순차)",
+                        "POST /api/v1/analyses/parallel - 병렬 분석 실행 (동시)",
+                        "GET  /api/v1/analyses/status - 상태 조회"
                     )
                 )
             )
