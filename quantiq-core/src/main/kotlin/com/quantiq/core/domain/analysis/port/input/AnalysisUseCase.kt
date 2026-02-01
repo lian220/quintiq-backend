@@ -11,18 +11,21 @@ interface AnalysisUseCase {
     /**
      * 기술적 분석 트리거
      * SMA, RSI, MACD 등 기술적 지표 분석 요청
+     * @param targetDate 분석 대상 날짜 (yyyy-MM-dd), null이면 당일
      */
-    fun triggerTechnicalAnalysis(): CompletableFuture<String>
+    fun triggerTechnicalAnalysis(targetDate: String? = null): CompletableFuture<String>
 
     /**
      * 뉴스 감정 분석 트리거
      * Alpha Vantage NEWS_SENTIMENT API를 통한 감정 분석 요청
+     * @param targetDate 분석 대상 날짜 (yyyy-MM-dd), null이면 당일
      */
-    fun triggerSentimentAnalysis(): CompletableFuture<String>
+    fun triggerSentimentAnalysis(targetDate: String? = null): CompletableFuture<String>
 
     /**
      * 통합 분석 트리거
      * 기술적 분석 + 감정 분석 + 통합 점수 계산
+     * @param targetDate 분석 대상 날짜 (yyyy-MM-dd), null이면 당일
      */
-    fun triggerCombinedAnalysis(): CompletableFuture<String>
+    fun triggerCombinedAnalysis(targetDate: String? = null): CompletableFuture<String>
 }

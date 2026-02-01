@@ -12,8 +12,11 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
+import java.time.LocalDate
+import java.util.concurrent.CompletableFuture
 
 /**
  * 분석 Controller (Input Adapter)
@@ -84,22 +87,30 @@ class AnalysisController(
         ]
     )
     @PostMapping("/technical")
-    fun executeTechnicalAnalysis(): ResponseEntity<Map<String, Any>> {
+    fun executeTechnicalAnalysis(
+        @RequestParam(required = false) startDate: String?,
+        @RequestParam(required = false) endDate: String?
+    ): ResponseEntity<Map<String, Any>> {
         return try {
-            logger.info("기술적 분석 수동 트리거 요청 받음")
+            val dates = generateDateRange(startDate, endDate)
+            logger.info("기술적 분석 요청: ${dates.size}개 날짜 (${dates.first()} ~ ${dates.last()})")
 
-            analysisUseCase.triggerTechnicalAnalysis()
-                .thenApply { result ->
-                    ResponseEntity.ok(
-                        mapOf<String, Any>(
-                            "success" to true,
-                            "message" to result,
-                            "analysisType" to "TECHNICAL",
-                            "timestamp" to Instant.now().toString()
-                        )
-                    )
-                }
-                .get()
+            val futures = dates.map { date ->
+                analysisUseCase.triggerTechnicalAnalysis(date.toString())
+            }
+
+            CompletableFuture.allOf(*futures.toTypedArray()).get()
+
+            ResponseEntity.ok(
+                mapOf<String, Any>(
+                    "success" to true,
+                    "message" to "기술적 분석 요청이 Kafka에 발행되었습니다.",
+                    "analysisType" to "TECHNICAL",
+                    "dates" to dates.map { it.toString() },
+                    "count" to dates.size,
+                    "timestamp" to Instant.now().toString()
+                )
+            )
         } catch (e: Exception) {
             logger.error("기술적 분석 트리거 실패", e)
             ResponseEntity.status(500).body(
@@ -137,22 +148,30 @@ class AnalysisController(
         ]
     )
     @PostMapping("/sentiment")
-    fun executeSentimentAnalysis(): ResponseEntity<Map<String, Any>> {
+    fun executeSentimentAnalysis(
+        @RequestParam(required = false) startDate: String?,
+        @RequestParam(required = false) endDate: String?
+    ): ResponseEntity<Map<String, Any>> {
         return try {
-            logger.info("감정 분석 수동 트리거 요청 받음")
+            val dates = generateDateRange(startDate, endDate)
+            logger.info("감정 분석 요청: ${dates.size}개 날짜 (${dates.first()} ~ ${dates.last()})")
 
-            analysisUseCase.triggerSentimentAnalysis()
-                .thenApply { result ->
-                    ResponseEntity.ok(
-                        mapOf<String, Any>(
-                            "success" to true,
-                            "message" to result,
-                            "analysisType" to "SENTIMENT",
-                            "timestamp" to Instant.now().toString()
-                        )
-                    )
-                }
-                .get()
+            val futures = dates.map { date ->
+                analysisUseCase.triggerSentimentAnalysis(date.toString())
+            }
+
+            CompletableFuture.allOf(*futures.toTypedArray()).get()
+
+            ResponseEntity.ok(
+                mapOf<String, Any>(
+                    "success" to true,
+                    "message" to "뉴스 감정 분석 요청이 Kafka에 발행되었습니다.",
+                    "analysisType" to "SENTIMENT",
+                    "dates" to dates.map { it.toString() },
+                    "count" to dates.size,
+                    "timestamp" to Instant.now().toString()
+                )
+            )
         } catch (e: Exception) {
             logger.error("감정 분석 트리거 실패", e)
             ResponseEntity.status(500).body(
@@ -192,22 +211,30 @@ class AnalysisController(
         ]
     )
     @PostMapping("/combined")
-    fun executeCombinedAnalysis(): ResponseEntity<Map<String, Any>> {
+    fun executeCombinedAnalysis(
+        @RequestParam(required = false) startDate: String?,
+        @RequestParam(required = false) endDate: String?
+    ): ResponseEntity<Map<String, Any>> {
         return try {
-            logger.info("통합 분석 수동 트리거 요청 받음")
+            val dates = generateDateRange(startDate, endDate)
+            logger.info("통합 분석 요청: ${dates.size}개 날짜 (${dates.first()} ~ ${dates.last()})")
 
-            analysisUseCase.triggerCombinedAnalysis()
-                .thenApply { result ->
-                    ResponseEntity.ok(
-                        mapOf<String, Any>(
-                            "success" to true,
-                            "message" to result,
-                            "analysisType" to "COMBINED",
-                            "timestamp" to Instant.now().toString()
-                        )
-                    )
-                }
-                .get()
+            val futures = dates.map { date ->
+                analysisUseCase.triggerCombinedAnalysis(date.toString())
+            }
+
+            CompletableFuture.allOf(*futures.toTypedArray()).get()
+
+            ResponseEntity.ok(
+                mapOf<String, Any>(
+                    "success" to true,
+                    "message" to "통합 분석 요청이 Kafka에 발행되었습니다.",
+                    "analysisType" to "COMBINED",
+                    "dates" to dates.map { it.toString() },
+                    "count" to dates.size,
+                    "timestamp" to Instant.now().toString()
+                )
+            )
         } catch (e: Exception) {
             logger.error("통합 분석 트리거 실패", e)
             ResponseEntity.status(500).body(
@@ -332,6 +359,31 @@ class AnalysisController(
                     "message" to (e.message ?: "Unknown error")
                 )
             )
+        }
+    }
+
+    /**
+     * 날짜 범위 생성 헬퍼 함수
+     */
+    private fun generateDateRange(startDate: String?, endDate: String?): List<LocalDate> {
+        return when {
+            startDate != null && endDate != null -> {
+                val start = LocalDate.parse(startDate)
+                val end = LocalDate.parse(endDate)
+                val dates = mutableListOf<LocalDate>()
+                var current = start
+                while (!current.isAfter(end)) {
+                    dates.add(current)
+                    current = current.plusDays(1)
+                }
+                dates
+            }
+            startDate != null -> {
+                listOf(LocalDate.parse(startDate))
+            }
+            else -> {
+                listOf(LocalDate.now())
+            }
         }
     }
 }

@@ -24,9 +24,10 @@ class AnalysisManagementService(
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val kst = ZoneId.of("Asia/Seoul")
 
-    override fun triggerTechnicalAnalysis(): CompletableFuture<String> {
+    override fun triggerTechnicalAnalysis(targetDate: String?): CompletableFuture<String> {
         return try {
-            logger.info("기술적 분석 요청 시작")
+            val dateInfo = targetDate ?: "당일"
+            logger.info("기술적 분석 요청 시작 (기준일: $dateInfo)")
 
             val requestId = UUID.randomUUID().toString()
 
@@ -38,22 +39,23 @@ class AnalysisManagementService(
                 null
             }
 
-            // threadTs를 포함한 요청 생성
+            // threadTs와 targetDate를 포함한 요청 생성
             val request = AnalysisRequest(
                 timestamp = ZonedDateTime.now(kst).toString(),
                 source = "quartz_scheduler",
                 requestId = requestId,
                 threadTs = threadTs,
-                analysisType = "TECHNICAL"
+                analysisType = "TECHNICAL",
+                targetDate = targetDate
             )
 
-            // Kafka 이벤트 발행 (threadTs 포함)
+            // Kafka 이벤트 발행 (threadTs, targetDate 포함)
             messagePublisher.publishAnalysisRequest(
                 TOPIC_ANALYSIS_TECHNICAL_REQUEST,
                 request
             )
 
-            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs, type=TECHNICAL")
+            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs, type=TECHNICAL, targetDate=$dateInfo")
 
             CompletableFuture.completedFuture("기술적 분석 요청이 Kafka에 발행되었습니다.")
         } catch (e: Exception) {
@@ -70,9 +72,10 @@ class AnalysisManagementService(
         }
     }
 
-    override fun triggerSentimentAnalysis(): CompletableFuture<String> {
+    override fun triggerSentimentAnalysis(targetDate: String?): CompletableFuture<String> {
         return try {
-            logger.info("뉴스 감정 분석 요청 시작")
+            val dateInfo = targetDate ?: "당일"
+            logger.info("뉴스 감정 분석 요청 시작 (기준일: $dateInfo)")
 
             val requestId = UUID.randomUUID().toString()
 
@@ -84,22 +87,23 @@ class AnalysisManagementService(
                 null
             }
 
-            // threadTs를 포함한 요청 생성
+            // threadTs와 targetDate를 포함한 요청 생성
             val request = AnalysisRequest(
                 timestamp = ZonedDateTime.now(kst).toString(),
                 source = "quartz_scheduler",
                 requestId = requestId,
                 threadTs = threadTs,
-                analysisType = "SENTIMENT"
+                analysisType = "SENTIMENT",
+                targetDate = targetDate
             )
 
-            // Kafka 이벤트 발행 (threadTs 포함)
+            // Kafka 이벤트 발행 (threadTs, targetDate 포함)
             messagePublisher.publishAnalysisRequest(
                 TOPIC_ANALYSIS_SENTIMENT_REQUEST,
                 request
             )
 
-            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs, type=SENTIMENT")
+            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs, type=SENTIMENT, targetDate=$dateInfo")
 
             CompletableFuture.completedFuture("뉴스 감정 분석 요청이 Kafka에 발행되었습니다.")
         } catch (e: Exception) {
@@ -116,36 +120,38 @@ class AnalysisManagementService(
         }
     }
 
-    override fun triggerCombinedAnalysis(): CompletableFuture<String> {
+    override fun triggerCombinedAnalysis(targetDate: String?): CompletableFuture<String> {
         return try {
-            logger.info("통합 분석 요청 시작")
+            val dateInfo = targetDate ?: "당일"
+            logger.info("통합 분석 요청 시작 (기준일: $dateInfo)")
 
             val requestId = UUID.randomUUID().toString()
 
             // Slack 알림 전송 먼저 (스레드 루트 메시지 생성 → threadTs 반환)
             val threadTs = try {
                 notificationSender.notifyCombinedAnalysisRequest(requestId)
-            } catch (e: Exception) {
-                logger.warn("Slack 알림 전송 실패: ${e.message}")
+            } catch (slackError: Exception) {
+                logger.warn("Slack 알림 전송 실패: ${slackError.message}")
                 null
             }
 
-            // threadTs를 포함한 요청 생성
+            // threadTs와 targetDate를 포함한 요청 생성
             val request = AnalysisRequest(
                 timestamp = ZonedDateTime.now(kst).toString(),
                 source = "quartz_scheduler",
                 requestId = requestId,
                 threadTs = threadTs,
-                analysisType = "COMBINED"
+                analysisType = "COMBINED",
+                targetDate = targetDate
             )
 
-            // Kafka 이벤트 발행 (threadTs 포함)
+            // Kafka 이벤트 발행 (threadTs, targetDate 포함)
             messagePublisher.publishAnalysisRequest(
                 TOPIC_ANALYSIS_COMBINED_REQUEST,
                 request
             )
 
-            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs, type=COMBINED")
+            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs, type=COMBINED, targetDate=$dateInfo")
 
             CompletableFuture.completedFuture("통합 분석 요청이 Kafka에 발행되었습니다.")
         } catch (e: Exception) {

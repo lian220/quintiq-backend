@@ -8,5 +8,6 @@ data class AnalysisRequest(
     val source: String,
     val requestId: String,
     val threadTs: String? = null,
-    val analysisType: String // "TECHNICAL", "SENTIMENT", "COMBINED"
+    val analysisType: String, // "TECHNICAL", "SENTIMENT", "COMBINED"
+    val targetDate: String? = null // 분석 대상 날짜 (yyyy-MM-dd)
 )
