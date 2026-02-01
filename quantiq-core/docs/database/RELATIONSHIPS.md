@@ -32,41 +32,52 @@ TradeEntity (1:1) ←───────── TradeSignalExecutedEntity
     │                            │
     │                            └── recommendation_id (MongoDB 참조)
     │
-    └─── ticker ──→ (MongoDB) Stock
+    └─── ticker ──→ StockEntity (PostgreSQL) ✨
+                     └── 2026-02-01 마이그레이션 완료
 ```
 
 ---
 
-## MongoDB 간 참조 관계
+## PostgreSQL ↔ MongoDB 연동
 
-### 종목 분석 데이터 흐름
+### 종목 데이터 흐름 (Stock 마이그레이션 완료)
 
 ```
-Stock (종목 정보)
+StockEntity (PostgreSQL) ✨ 2026-02-01 마이그레이션
   │
-  │ ticker 참조
+  │ ticker로 참조 (Soft Reference)
   │
-  ├──→ StockAnalysis (기술적 분석)
+  ├──→ StockAnalysis (MongoDB - 기술적 분석)
   │        │
   │        └─── metrics: mae, rmse, accuracy
   │
-  ├──→ SentimentAnalysis (감정 분석)
+  ├──→ SentimentAnalysis (MongoDB - 감정 분석)
   │        │
   │        └─── sentiment_score, article_count
   │
-  ├──→ StockRecommendation (종합 추천)
+  ├──→ StockRecommendation (MongoDB - 종합 추천)
   │        │
   │        ├─── composite_score (종합 점수)
   │        ├─── technical_indicators (기술적 지표)
   │        └─── sentiment_score (감정 점수)
   │
-  └──→ PredictionResult (Vertex AI 예측)
+  └──→ PredictionResult (MongoDB - Vertex AI 예측)
            │
            ├─── predicted_price
            ├─── confidence
            ├─── signal (BUY/SELL/HOLD)
            └─── vertex_ai_job_id
 ```
+
+### 마이그레이션 배경
+- **이전**: MongoDB `stocks` 컬렉션
+- **현재**: PostgreSQL `stocks` 테이블
+- **이유**: 주식 메타데이터는 정적 참조 데이터로 RDB가 더 적합
+- **참조 방식**: ticker (String)로 Soft Reference 유지
+
+---
+
+## MongoDB 간 참조 관계
 
 ---
 
@@ -249,6 +260,34 @@ WHERE user_id = ?
 -- INDEX: (user_id, execution_decision, created_at)
 ```
 
+#### 4. 활성 종목 조회 ✨
+```sql
+SELECT * FROM stocks
+WHERE is_active = true
+ORDER BY ticker;
+
+-- INDEX: idx_stocks_is_active (WHERE is_active = TRUE)
+```
+
+#### 5. 섹터별 종목 조회 ✨
+```sql
+SELECT * FROM stocks
+WHERE sector = ?
+  AND is_active = true
+ORDER BY stock_name;
+
+-- INDEX: idx_stocks_sector (WHERE sector IS NOT NULL)
+```
+
+#### 6. ETF 목록 조회 ✨
+```sql
+SELECT * FROM stocks
+WHERE is_etf = true
+  AND is_active = true;
+
+-- INDEX: idx_stocks_is_etf (WHERE is_etf = TRUE)
+```
+
 ### MongoDB
 
 #### 1. 추천 종목 조회 (점수 높은 순)
@@ -347,14 +386,14 @@ fun executeBuyOrder(userId: Long, ticker: String, quantity: Int, price: BigDecim
 // PostgreSQL → MongoDB 참조
 data class TradeSignalExecutedEntity(
     val recommendationId: String,  // MongoDB StockRecommendation._id
-    val ticker: String,            // MongoDB Stock.ticker
+    val ticker: String,            // PostgreSQL StockEntity.ticker ✨
     // ...
 )
 
 // 조회 시 JOIN 없이 별도 쿼리
 val signal = tradeSignalExecutedRepository.findById(id)
-val recommendation = stockRecommendationRepository.findById(signal.recommendationId)
-val stock = stockRepository.findByTicker(signal.ticker)
+val recommendation = stockRecommendationRepository.findById(signal.recommendationId)  // MongoDB
+val stock = stockJpaRepository.findByTicker(signal.ticker)  // PostgreSQL ✨
 ```
 
 ### 참조 데이터 중복 저장 (Denormalization)
