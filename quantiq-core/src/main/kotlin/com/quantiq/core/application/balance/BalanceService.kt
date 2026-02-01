@@ -1,11 +1,16 @@
 package com.quantiq.core.application.balance
 
 import com.quantiq.core.domain.trading.port.output.TradingApiPort
+import com.quantiq.core.domain.model.BalanceWithProfitResponse
+import com.quantiq.core.domain.model.HoldingPosition
+import com.quantiq.core.domain.model.AccountSummary
 import com.quantiq.core.adapter.output.persistence.jpa.AccountBalanceEntity
 import com.quantiq.core.adapter.output.persistence.jpa.UserEntity
 import com.quantiq.core.adapter.output.persistence.jpa.AccountBalanceJpaRepository
 import com.quantiq.core.adapter.output.persistence.jpa.UserJpaRepository
+import com.quantiq.core.adapter.output.persistence.jpa.UserKisAccountJpaRepository
 import java.math.BigDecimal
+import java.time.LocalDateTime
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,13 +19,15 @@ import org.springframework.transaction.annotation.Transactional
 class BalanceService(
     private val tradingApiPort: TradingApiPort,
     private val accountBalanceJpaRepository: AccountBalanceJpaRepository,
-    private val userJpaRepository: UserJpaRepository
+    private val userJpaRepository: UserJpaRepository,
+    private val userKisAccountJpaRepository: UserKisAccountJpaRepository
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
      * KIS API를 통해 해외 잔고 조회
      */
+    @Suppress("UNCHECKED_CAST")
     fun getOverseasBalance(): Map<String, Any> {
         val result = tradingApiPort.getOverseasBalance()
 
@@ -169,7 +176,6 @@ class BalanceService(
      * 수익 정보 조회
      */
     fun getTotalProfit(): Map<String, Any> {
-        val balance = getOverseasBalance()
         return mapOf(
             "success" to true,
             "total_profit_usd" to 0.0,
@@ -184,5 +190,79 @@ class BalanceService(
     @Transactional(readOnly = true)
     fun getTotalCashInSystem(): BigDecimal {
         return accountBalanceJpaRepository.getTotalCashInSystem() ?: BigDecimal.ZERO
+    }
+
+    /**
+     * User 기준 잔고 및 수익률 조회 (KIS API)
+     * @param userId 사용자 ID (String)
+     * @return 보유 종목, 수익률, 계좌 요약 정보
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Transactional(readOnly = true)
+    fun getBalanceWithProfit(userId: String): BalanceWithProfitResponse {
+        logger.info("💰 Fetching balance and profit for user: $userId")
+
+        // 1. 사용자 KIS 계정 정보 조회
+        val kisAccount = userKisAccountJpaRepository.findActiveByUserUserId(userId)
+            .orElseThrow { IllegalArgumentException("User KIS account not found or not active: $userId") }
+
+        // 2. KIS API 호출 (사용자별 인증 정보 사용)
+        val kisResponse = tradingApiPort.getOverseasBalance()
+
+        // 3. KIS API 응답 파싱
+        val output1 = kisResponse["output1"] as? List<Map<String, Any>> ?: emptyList()
+        val output2 = kisResponse["output2"] as? Map<String, Any> ?: emptyMap()
+
+        // 4. 보유 종목 리스트 변환
+        val holdings = output1.map { item ->
+            HoldingPosition(
+                ticker = item["pdno"] as? String ?: "",
+                name = item["prdt_name"] as? String ?: "",
+                quantity = (item["ovrs_cblc_qty"] as? String)?.toIntOrNull() ?: 0,
+                averagePrice = (item["pchs_avg_pric"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                currentPrice = (item["now_pric2"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                evaluationAmount = (item["ovrs_stck_evlu_amt"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                profitAmount = (item["evlu_pfls_amt"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                profitRate = (item["evlu_pfls_rt"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                currency = item["crcy_cd"] as? String ?: "USD",
+                exchange = item["ovrs_excg_cd"] as? String ?: "NASD"
+            )
+        }
+
+        // 5. 계좌 전체 요약 정보
+        val totalPurchaseAmount = (output2["frcr_pchs_amt1"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val totalEvaluationAmount = (output2["tot_evlu_amt"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val realizedProfit = (output2["ovrs_rlzt_pfls_amt"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val unrealizedProfit = (output2["evlu_pfls_smtl_amt"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val totalProfit = (output2["ovrs_tot_pfls"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        val totalProfitRate = (output2["rlzt_erng_rt"] as? String)?.toBigDecimalOrNull() ?: BigDecimal.ZERO
+
+        val summary = AccountSummary(
+            totalPurchaseAmount = totalPurchaseAmount,
+            totalEvaluationAmount = totalEvaluationAmount,
+            realizedProfit = realizedProfit,
+            unrealizedProfit = unrealizedProfit,
+            totalProfit = totalProfit,
+            totalProfitRate = totalProfitRate,
+            currency = "USD"
+        )
+
+        // 6. 현금 잔고 (PostgreSQL)
+        val cashBalance = getAvailableCashByUserId(userId)
+
+        // 7. 총 자산
+        val totalAssets = cashBalance + totalEvaluationAmount
+
+        logger.info("✅ Balance fetched: holdings=${holdings.size}, totalProfit=$totalProfit, profitRate=$totalProfitRate%")
+
+        return BalanceWithProfitResponse(
+            userId = userId,
+            accountNumber = kisAccount.accountNumber,
+            holdings = holdings,
+            summary = summary,
+            cashBalance = cashBalance,
+            totalAssets = totalAssets,
+            timestamp = LocalDateTime.now().toString()
+        )
     }
 }

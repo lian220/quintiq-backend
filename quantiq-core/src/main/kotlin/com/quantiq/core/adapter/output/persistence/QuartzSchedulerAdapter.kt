@@ -49,7 +49,6 @@ class QuartzSchedulerAdapter(
             for (triggerKey in triggerKeys) {
                 val trigger = scheduler.getTrigger(triggerKey)
                 val jobKey = trigger?.jobKey
-                val job = if (jobKey != null) scheduler.getJobDetail(jobKey) else null
 
                 schedules[triggerKey.name] = ScheduleInfo(
                     triggerName = triggerKey.name,

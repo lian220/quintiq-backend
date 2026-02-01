@@ -2,6 +2,7 @@ package com.quantiq.core.application.trading
 
 import com.quantiq.core.adapter.output.persistence.jpa.*
 import com.quantiq.core.adapter.output.persistence.mongodb.StockRecommendationRepository
+import com.quantiq.core.adapter.output.persistence.mongodb.PredictionResultMongoRepository
 import com.quantiq.core.adapter.output.persistence.jpa.TradingConfigJpaRepository
 import com.quantiq.core.adapter.output.persistence.jpa.TradeJpaRepository
 import com.quantiq.core.adapter.output.persistence.jpa.TradeSignalExecutedJpaRepository
@@ -20,6 +21,7 @@ class AutoTradingService(
     private val userJpaRepository: UserJpaRepository,
     private val tradingConfigJpaRepository: TradingConfigJpaRepository,
     private val stockRecommendationRepository: StockRecommendationRepository,
+    private val predictionResultMongoRepository: PredictionResultMongoRepository,
     private val tradeJpaRepository: TradeJpaRepository,
     private val tradeSignalExecutedJpaRepository: TradeSignalExecutedJpaRepository,
     private val balanceService: BalanceService
@@ -29,15 +31,21 @@ class AutoTradingService(
     @Transactional
     fun executeAutoTrading() {
         logger.info("🚀 Starting Auto Trading Execution...")
-        val today = LocalDate.now().toString()
+        val today = LocalDate.now()
 
-        // 1️⃣ 추천 종목 조회 (MongoDB)
-        val recommendations = stockRecommendationRepository.findByDateAndIsRecommendedTrue(today)
-        logger.info("✅ Found ${recommendations.size} recommendations for today ($today)")
+        // 1️⃣ Vertex AI 예측 결과 조회 (MongoDB)
+        // 신뢰도 70% 이상인 매수 신호만 조회
+        val predictions = predictionResultMongoRepository.findHighConfidenceBuySignals(today, 0.7)
+        logger.info("✅ Found ${predictions.size} high-confidence buy signals for today ($today)")
 
-        if (recommendations.isEmpty()) {
-            logger.info("❌ No recommendations found. Skipping trading.")
+        if (predictions.isEmpty()) {
+            logger.info("❌ No high-confidence buy signals found. Skipping trading.")
             return
+        }
+
+        // 예측 결과 로깅
+        predictions.forEach { prediction ->
+            logger.info("📊 ${prediction.symbol}: Price=${prediction.predictedPrice}, Confidence=${prediction.confidence}, Change=${prediction.predictedChangePercent}%")
         }
 
         // 2️⃣ 활성 사용자 조회 (최적화된 쿼리 - PostgreSQL)
@@ -54,43 +62,45 @@ class AutoTradingService(
         var totalTradesCreated = 0
         var totalTradesSkipped = 0
 
-        activeConfigs.forEach { tradingConfig ->
+        activeConfigs.forEach configLoop@{ tradingConfig ->
             try {
                 val user = tradingConfig.user
+                val userId = user.id ?: return@configLoop
                 logger.info("👤 Processing user: ${user.userId}")
 
                 // 3️⃣ 계좌 잔액 조회 (PostgreSQL)
-                val availableCash = balanceService.getAvailableCash(user.id!!)
+                val availableCash = balanceService.getAvailableCash(userId)
                 logger.info("💰 User ${user.userId} available cash: $availableCash")
 
                 if (availableCash <= BigDecimal.ZERO) {
                     logger.info("⚠️ User ${user.userId} has no available cash. Skipping.")
-                    return@forEach
+                    return@configLoop
                 }
 
                 // 4️⃣ 거래 실행
                 val maxStocks = tradingConfig.maxStocksToBuy
                 val maxAmountPerStock = tradingConfig.maxAmountPerStock
-                val minCompositeScore = tradingConfig.minCompositeScore
+                val minConfidence = tradingConfig.minCompositeScore.toDouble() / 100.0 // 예: 70 -> 0.7
 
-                // 점수 필터링 및 상위 N개 선택
-                val targetStocks = recommendations
-                    .filter { it.compositeScore?.toBigDecimal() ?: BigDecimal.ZERO >= minCompositeScore }
+                // Vertex AI 예측 결과를 신뢰도로 필터링 및 상위 N개 선택
+                val targetPredictions = predictions
+                    .filter { it.confidence >= minConfidence }
+                    .sortedByDescending { it.confidence }
                     .take(maxStocks)
 
-                logger.info("📊 Target stocks after filtering: ${targetStocks.size}")
+                logger.info("📊 Target stocks after filtering: ${targetPredictions.size}")
 
                 var cashRemaining = availableCash
 
-                targetStocks.forEach { recommendation ->
+                targetPredictions.forEach predictionLoop@{ prediction ->
                     try {
-                        val ticker = recommendation.ticker
-                        val price = recommendation.currentPrice?.toBigDecimal() ?: return@forEach
-                        val recommendationId = recommendation.id ?: return@forEach
+                        val ticker = prediction.symbol
+                        val price = prediction.predictedPrice.toBigDecimal()
+                        val predictionId = prediction.id ?: return@predictionLoop
 
                         // 이미 오늘 같은 종목 거래했는지 확인
                         val recentTrades = tradeJpaRepository.findRecentTrade(
-                            user.id!!,
+                            userId,
                             ticker,
                             TradeSide.BUY,
                             TradeStatus.PENDING,
@@ -98,37 +108,37 @@ class AutoTradingService(
                         )
                         if (recentTrades.isNotEmpty()) {
                             logger.info("⏭️ Skipping $ticker - already has pending order")
-                            recordSignalExecution(user, recommendationId, ticker, recommendation.compositeScore ?: 0.0, ExecutionDecision.SKIPPED, "Already has pending order", null)
+                            recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.SKIPPED, "Already has pending order", null)
                             totalTradesSkipped++
-                            return@forEach
+                            return@predictionLoop
                         }
 
                         // 주문 금액 계산
                         val orderAmount = maxAmountPerStock.min(cashRemaining)
                         if (orderAmount < price) {
                             logger.info("⚠️ Insufficient funds for $ticker (need $price, have $orderAmount)")
-                            recordSignalExecution(user, recommendationId, ticker, recommendation.compositeScore ?: 0.0, ExecutionDecision.SKIPPED, "Insufficient funds", null)
+                            recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.SKIPPED, "Insufficient funds", null)
                             totalTradesSkipped++
-                            return@forEach
+                            return@predictionLoop
                         }
 
                         // 수량 계산 (소수점 버림)
                         val quantity = orderAmount.divide(price, 0, RoundingMode.DOWN).toInt()
                         if (quantity <= 0) {
                             logger.warn("⚠️ Calculated quantity is 0 for $ticker")
-                            recordSignalExecution(user, recommendationId, ticker, recommendation.compositeScore ?: 0.0, ExecutionDecision.SKIPPED, "Quantity would be 0", null)
+                            recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.SKIPPED, "Quantity would be 0", null)
                             totalTradesSkipped++
-                            return@forEach
+                            return@predictionLoop
                         }
 
                         val totalAmount = price * quantity.toBigDecimal()
 
                         // 5️⃣ 현금 잠금
-                        if (!balanceService.lockCash(user.id!!, totalAmount)) {
+                        if (!balanceService.lockCash(userId, totalAmount)) {
                             logger.warn("⚠️ Failed to lock cash for $ticker")
-                            recordSignalExecution(user, recommendationId, ticker, recommendation.compositeScore ?: 0.0, ExecutionDecision.FAILED, "Failed to lock cash", null)
+                            recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.FAILED, "Failed to lock cash", null)
                             totalTradesSkipped++
-                            return@forEach
+                            return@predictionLoop
                         }
 
                         // 6️⃣ 거래 기록 생성 (PostgreSQL)
@@ -144,9 +154,9 @@ class AutoTradingService(
                         val savedTrade = tradeJpaRepository.save(trade)
 
                         // 7️⃣ 신호 실행 로그 기록
-                        recordSignalExecution(user, recommendationId, ticker, recommendation.compositeScore ?: 0.0, ExecutionDecision.EXECUTED, null, savedTrade)
+                        recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.EXECUTED, null, savedTrade)
 
-                        logger.info("✅ Created BUY order: $ticker x$quantity @ $price = $totalAmount")
+                        logger.info("✅ Created BUY order: $ticker x$quantity @ $price = $totalAmount (Confidence: ${prediction.confidence})")
                         totalTradesCreated++
                         cashRemaining = cashRemaining - totalAmount
 
@@ -154,7 +164,7 @@ class AutoTradingService(
                         // kisClient.placeOrder(trade)
 
                     } catch (e: Exception) {
-                        logger.error("❌ Error processing recommendation for ${recommendation.ticker}", e)
+                        logger.error("❌ Error processing prediction for ${prediction.symbol}", e)
                     }
                 }
 

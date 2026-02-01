@@ -29,7 +29,7 @@ class EventPublisher(
             logger.debug("Event payload: $message")
 
             kafkaTemplate.send(topic, message)
-                .whenComplete { result, ex ->
+                .whenComplete { _, ex ->
                     if (ex == null) {
                         logger.info("✅ Event published successfully: ${event.eventId}")
                     } else {
