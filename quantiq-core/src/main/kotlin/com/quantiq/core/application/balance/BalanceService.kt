@@ -26,10 +26,11 @@ class BalanceService(
 
     /**
      * KIS API를 통해 해외 잔고 조회
+     * @param userId 사용자 ID
      */
     @Suppress("UNCHECKED_CAST")
-    fun getOverseasBalance(): Map<String, Any> {
-        val result = tradingApiPort.getOverseasBalance()
+    fun getOverseasBalance(userId: String): Map<String, Any> {
+        val result = tradingApiPort.getOverseasBalance(userId)
 
         val output1 = result["output1"] as? List<Map<String, Any>> ?: emptyList()
         val output2 = result["output2"] as? List<Any> ?: emptyList()
@@ -198,7 +199,7 @@ class BalanceService(
      * @return 보유 종목, 수익률, 계좌 요약 정보
      */
     @Suppress("UNCHECKED_CAST")
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = false)
     fun getBalanceWithProfit(userId: String): BalanceWithProfitResponse {
         logger.info("💰 Fetching balance and profit for user: $userId")
 
@@ -207,7 +208,7 @@ class BalanceService(
             .orElseThrow { IllegalArgumentException("User KIS account not found or not active: $userId") }
 
         // 2. KIS API 호출 (사용자별 인증 정보 사용)
-        val kisResponse = tradingApiPort.getOverseasBalance()
+        val kisResponse = tradingApiPort.getOverseasBalance(userId)
 
         // 3. KIS API 응답 파싱
         val output1 = kisResponse["output1"] as? List<Map<String, Any>> ?: emptyList()

@@ -34,6 +34,9 @@ data class UserEntity(
     @OneToOne(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
     var accountBalance: AccountBalanceEntity? = null,
 
+    @OneToOne(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
+    var kisAccount: UserKisAccountEntity? = null,
+
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
     val trades: MutableList<TradeEntity> = mutableListOf(),
 

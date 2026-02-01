@@ -56,6 +56,20 @@ class EconomicDataRepository:
             logger.error(f"지표 조회 실패: {e}")
             return []
 
+    def find_active_stocks(self) -> List[Dict[str, Any]]:
+        """활성화된 종목을 조회합니다."""
+        try:
+            if self.db is None:
+                logger.error("MongoDB 연결 없음")
+                return []
+
+            collection = self.db["stocks"]
+            return list(collection.find({"is_active": True}))
+
+        except Exception as e:
+            logger.error(f"종목 조회 실패: {e}")
+            return []
+
     def upsert_daily_data(self, date: str, data: Dict[str, Any]) -> bool:
         """
         daily_stock_data 컬렉션에 날짜별 데이터를 upsert합니다.
@@ -64,7 +78,8 @@ class EconomicDataRepository:
             date: 날짜 (YYYY-MM-DD 형식)
             data: {
                 "fred_indicators": {"GDP": 123.45, ...},
-                "yfinance_indicators": {"SP500": 4500.12, ...}
+                "yfinance_indicators": {"SP500": 4500.12, ...},
+                "stocks": {"AAPL": {"close_price": 150.0}, ...}
             }
 
         Returns:

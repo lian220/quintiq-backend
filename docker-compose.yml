@@ -141,6 +141,7 @@ services:
       SLACK_CHANNEL: "C0A1XASTLH2"
     volumes:
       - ./quantiq-data-engine:/app
+      - ./credentials:/app/credentials
     deploy:
       resources:
         limits:
@@ -167,6 +168,9 @@ services:
         condition: service_started
     env_file:
       - .env.local
+    volumes:
+      - ./credentials:/app/credentials
+      - ./quantiq-data-engine:/quantiq-data-engine
     environment:
       TZ: "Asia/Seoul"
       # PostgreSQL

@@ -10,7 +10,8 @@ interface RestApiClient {
     /**
      * 경제 데이터 수집 API 호출
      * @param url API 엔드포인트 URL
+     * @param targetDate 수집할 기준 날짜 (YYYY-MM-DD). null이면 당일 기준
      * @return 응답 결과
      */
-    fun callEconomicDataCollectionApi(url: String): CompletableFuture<String>
+    fun callEconomicDataCollectionApi(url: String, targetDate: String? = null): CompletableFuture<String>
 }

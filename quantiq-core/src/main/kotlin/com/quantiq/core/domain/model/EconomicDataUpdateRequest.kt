@@ -7,7 +7,8 @@ data class EconomicDataUpdateRequest(
     val timestamp: String,
     val source: String,
     val requestId: String,
-    val threadTs: String? = null  // Slack 스레드 타임스탬프 (답글용)
+    val threadTs: String? = null,  // Slack 스레드 타임스탬프 (답글용)
+    val targetDate: String? = null  // 수집할 기준 날짜 (YYYY-MM-DD). null이면 당일 기준
 ) {
     override fun toString(): String {
         return """
@@ -15,7 +16,8 @@ data class EconomicDataUpdateRequest(
                 "timestamp": "$timestamp",
                 "source": "$source",
                 "requestId": "$requestId",
-                "threadTs": "$threadTs"
+                "threadTs": "$threadTs",
+                "targetDate": "$targetDate"
             }
         """.trimIndent()
     }

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pytz import timezone
 
 from .service import EconomicDataService
-from .schemas import EconomicDataResponse, StatusResponse
+from .schemas import EconomicDataRequest, EconomicDataResponse, StatusResponse
 from src.services.slack_notifier import SlackNotifier
 
 logger = logging.getLogger(__name__)
@@ -21,20 +21,29 @@ def get_service():
 
 
 @router.post("/collect", response_model=EconomicDataResponse)
-def collect_economic_data_endpoint(service: EconomicDataService = Depends(get_service)):
-    """경제 데이터 수집 REST API 엔드포인트"""
+def collect_economic_data_endpoint(
+    request: EconomicDataRequest = EconomicDataRequest(),
+    service: EconomicDataService = Depends(get_service)
+):
+    """
+    경제 데이터 수집 REST API 엔드포인트
+
+    Args:
+        target_date: 수집할 기준 날짜 (YYYY-MM-DD). 미입력 시 당일 기준으로 조회
+    """
     request_id = f"rest-{int(time_module.time())}"
+    target_date = request.target_date
 
     try:
         logger.info("=" * 80)
-        logger.info("경제 데이터 수집 REST API 요청 받음")
+        logger.info(f"경제 데이터 수집 REST API 요청 받음 (기준일: {target_date or '당일'})")
         logger.info("=" * 80)
 
         # 🔔 수집 시작 알림
         SlackNotifier.notify_economic_data_collection_start(request_id, "rest_api")
 
         start_time = time_module.time()
-        result = service.collect_economic_data()
+        result = service.collect_economic_data(target_date=target_date)
         elapsed_time = time_module.time() - start_time
 
         logger.info("✅ 경제 데이터 수집 완료")
@@ -43,13 +52,14 @@ def collect_economic_data_endpoint(service: EconomicDataService = Depends(get_se
         # 🔔 수집 완료 알림
         SlackNotifier.notify_economic_data_collection_success(
             request_id,
-            {"duration": f"{elapsed_time:.2f}초"}
+            {"duration": f"{elapsed_time:.2f}초", "target_date": result.get("target_date")}
         )
 
         return EconomicDataResponse(
             success=True,
             message="경제 데이터 수집 완료",
             timestamp=datetime.now(KST).isoformat(),
+            target_date=result.get("target_date"),
             fred_collected=result.get("fred_collected"),
             yahoo_collected=result.get("yahoo_collected")
         )

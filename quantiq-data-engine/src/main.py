@@ -14,6 +14,7 @@ from pytz import timezone
 from src.core.config import settings
 from src.core.database import MongoDB
 from src.features.economic_data.router import router as economic_router
+from src.features.ml_package.router import router as ml_package_router
 from src.features.economic_data.service import EconomicDataService
 from src.services.recommendation_service import RecommendationService
 from src.services.slack_notifier import SlackNotifier
@@ -30,6 +31,7 @@ app = FastAPI(title="Quantiq Data Engine")
 
 # Include routers
 app.include_router(economic_router)
+app.include_router(ml_package_router)
 
 
 @app.get("/")
@@ -117,10 +119,12 @@ def main():
                     request_id = payload.get("requestId", "unknown")
                     source = payload.get("source", "kafka")
                     thread_ts = payload.get("threadTs")  # Kotlin에서 전달받은 스레드 타임스탬프
+                    target_date = payload.get("targetDate")  # 수집할 기준 날짜 (YYYY-MM-DD)
 
                     logger.info("=" * 80)
                     logger.info("경제 데이터 업데이트 Kafka 메시지 수신")
                     logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Target Date: {target_date or '당일'}")
                     logger.info(f"Thread TS: {thread_ts}")
                     logger.info("=" * 80)
 
@@ -129,14 +133,15 @@ def main():
 
                     start_time = time.time()
                     try:
-                        # Service 호출
-                        result = economic_service.collect_economic_data()
+                        # Service 호출 (날짜 파라미터 전달)
+                        result = economic_service.collect_economic_data(target_date=target_date)
                         elapsed_time = time.time() - start_time
 
                         logger.info("✅ 경제 데이터 수집 완료")
 
                         # 수집 결과 데이터 구성
                         collection_summary = {
+                            "target_date": result.get("target_date"),
                             "duration": f"{elapsed_time:.2f}초",
                             "fred_collected": result.get("fred_collected", 0),
                             "yahoo_collected": result.get("yahoo_collected", 0),

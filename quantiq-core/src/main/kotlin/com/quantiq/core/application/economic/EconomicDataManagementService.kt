@@ -26,9 +26,10 @@ class EconomicDataManagementService(
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val kst = ZoneId.of("Asia/Seoul")
 
-    override fun triggerEconomicDataUpdate(): CompletableFuture<String> {
+    override fun triggerEconomicDataUpdate(targetDate: String?): CompletableFuture<String> {
         return try {
-            logger.info("경제 데이터 업데이트 요청 시작")
+            val dateInfo = targetDate ?: "당일"
+            logger.info("경제 데이터 업데이트 요청 시작 (기준일: $dateInfo)")
 
             val requestId = UUID.randomUUID().toString()
 
@@ -40,21 +41,22 @@ class EconomicDataManagementService(
                 null
             }
 
-            // threadTs를 포함한 요청 생성
+            // threadTs와 targetDate를 포함한 요청 생성
             val request = EconomicDataUpdateRequest(
                 timestamp = ZonedDateTime.now(kst).toString(),
                 source = "quartz_scheduler",
                 requestId = requestId,
-                threadTs = threadTs
+                threadTs = threadTs,
+                targetDate = targetDate
             )
 
-            // Kafka 이벤트 발행 (threadTs 포함)
+            // Kafka 이벤트 발행 (threadTs, targetDate 포함)
             messagePublisher.publishEconomicDataUpdateRequest(
                 TOPIC_ECONOMIC_DATA_UPDATE_REQUEST,
                 request
             )
 
-            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs")
+            logger.info("✅ Kafka 이벤트 발행 완료: requestId=$requestId, threadTs=$threadTs, targetDate=$dateInfo")
 
             CompletableFuture.completedFuture("경제 데이터 업데이트 요청이 Kafka에 발행되었습니다.")
         } catch (e: Exception) {
@@ -74,13 +76,15 @@ class EconomicDataManagementService(
         }
     }
 
-    override fun triggerEconomicDataUpdateViaRestApi(): CompletableFuture<String> {
+    override fun triggerEconomicDataUpdateViaRestApi(targetDate: String?): CompletableFuture<String> {
         return try {
-            logger.info("REST API를 통해 경제 데이터 업데이트 요청 시작")
+            val dateInfo = targetDate ?: "당일"
+            logger.info("REST API를 통해 경제 데이터 업데이트 요청 시작 (기준일: $dateInfo)")
 
-            // REST API 호출 (Output Port 사용)
+            // REST API 호출 (Output Port 사용, targetDate 전달)
             restApiClient.callEconomicDataCollectionApi(
-                "http://localhost:10020/api/economic/collect"
+                "http://localhost:10020/api/economic/collect",
+                targetDate
             )
         } catch (e: Exception) {
             logger.error("REST API 호출 실패", e)

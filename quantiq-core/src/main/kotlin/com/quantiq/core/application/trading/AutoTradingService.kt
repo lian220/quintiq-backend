@@ -8,6 +8,7 @@ import com.quantiq.core.adapter.output.persistence.jpa.TradeJpaRepository
 import com.quantiq.core.adapter.output.persistence.jpa.TradeSignalExecutedJpaRepository
 import com.quantiq.core.adapter.output.persistence.jpa.UserJpaRepository
 import com.quantiq.core.application.balance.BalanceService
+import com.quantiq.core.domain.trading.port.output.TradingApiPort
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -24,7 +25,8 @@ class AutoTradingService(
     private val predictionResultMongoRepository: PredictionResultMongoRepository,
     private val tradeJpaRepository: TradeJpaRepository,
     private val tradeSignalExecutedJpaRepository: TradeSignalExecutedJpaRepository,
-    private val balanceService: BalanceService
+    private val balanceService: BalanceService,
+    private val tradingApiPort: TradingApiPort
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -153,15 +155,57 @@ class AutoTradingService(
                         )
                         val savedTrade = tradeJpaRepository.save(trade)
 
-                        // 7️⃣ 신호 실행 로그 기록
+                        // 7️⃣ 실제 KIS API 주문 실행
+                        try {
+                            val orderResult = tradingApiPort.placeOrder(
+                                userId = user.userId,
+                                ticker = ticker,
+                                orderType = "BUY",
+                                quantity = quantity,
+                                price = "0" // 시장가 주문
+                            )
+
+                            val rtCd = orderResult["rt_cd"] as? String
+                            if (rtCd == "0") {
+                                // 주문 성공
+                                val kisOrderId = orderResult["output"]?.let {
+                                    (it as? Map<*, *>)?.get("KRX_FWDG_ORD_ORGNO") as? String
+                                }
+                                savedTrade.kisOrderId = kisOrderId
+                                savedTrade.status = TradeStatus.EXECUTED
+                                tradeJpaRepository.save(savedTrade)
+
+                                logger.info("✅ KIS order placed: $ticker x$quantity (orderId: $kisOrderId)")
+                            } else {
+                                // 주문 실패 - 거래 상태 업데이트 및 현금 잠금 해제
+                                savedTrade.status = TradeStatus.FAILED
+                                tradeJpaRepository.save(savedTrade)
+                                balanceService.unlockCash(userId, totalAmount)
+
+                                val errorMsg = orderResult["msg1"] as? String ?: "Unknown error"
+                                logger.error("❌ KIS order failed: $ticker - $errorMsg")
+
+                                recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.FAILED, "KIS API error: $errorMsg", savedTrade)
+                                totalTradesSkipped++
+                                return@predictionLoop
+                            }
+                        } catch (e: Exception) {
+                            logger.error("❌ Exception during KIS order: $ticker", e)
+                            savedTrade.status = TradeStatus.FAILED
+                            tradeJpaRepository.save(savedTrade)
+                            balanceService.unlockCash(userId, totalAmount)
+
+                            recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.FAILED, "Exception: ${e.message}", savedTrade)
+                            totalTradesSkipped++
+                            return@predictionLoop
+                        }
+
+                        // 8️⃣ 신호 실행 로그 기록
                         recordSignalExecution(user, predictionId, ticker, prediction.confidence * 100, ExecutionDecision.EXECUTED, null, savedTrade)
 
                         logger.info("✅ Created BUY order: $ticker x$quantity @ $price = $totalAmount (Confidence: ${prediction.confidence})")
                         totalTradesCreated++
                         cashRemaining = cashRemaining - totalAmount
-
-                        // TODO: 실제 KIS API 주문 실행
-                        // kisClient.placeOrder(trade)
 
                     } catch (e: Exception) {
                         logger.error("❌ Error processing prediction for ${prediction.symbol}", e)

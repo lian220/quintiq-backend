@@ -19,18 +19,31 @@ class EconomicDataService:
     def __init__(self):
         self.repository = EconomicDataRepository()
 
-    def collect_economic_data(self) -> Dict[str, Any]:
+    def collect_economic_data(self, target_date: str = None) -> Dict[str, Any]:
         """
         경제 데이터를 수집하여 daily_stock_data에 저장합니다.
         날짜별로 fred_indicators와 yfinance_indicators를 통합하여 저장합니다.
+
+        Args:
+            target_date: 수집할 기준 날짜 (YYYY-MM-DD). 미입력 시 당일 기준으로 조회
         """
         try:
-            logger.info("경제 데이터 수집 시작")
+            # 기준 날짜 설정
+            if target_date:
+                try:
+                    end_date = datetime.strptime(target_date, "%Y-%m-%d")
+                    logger.info(f"경제 데이터 수집 시작 (기준일: {target_date})")
+                except ValueError:
+                    logger.error(f"잘못된 날짜 형식: {target_date}. YYYY-MM-DD 형식이어야 합니다.")
+                    raise ValueError(f"Invalid date format: {target_date}. Expected YYYY-MM-DD")
+            else:
+                end_date = datetime.now()
+                logger.info(f"경제 데이터 수집 시작 (기준일: {end_date.strftime('%Y-%m-%d')} - 당일)")
 
             # 날짜 범위 설정
-            # GDP는 분기별, CPI/실업률은 월별이므로 90일 조회
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=90)
+            # GDP는 분기별 데이터로 발표 지연이 있어 365일 조회
+            # CPI/실업률은 월별, 금리/환율은 일별
+            start_date = end_date - timedelta(days=365)
             start_date_str = start_date.strftime("%Y-%m-%d")
             end_date_str = end_date.strftime("%Y-%m-%d")
 
@@ -41,7 +54,8 @@ class EconomicDataService:
             # 날짜별 데이터를 그룹화할 딕셔너리
             daily_data = defaultdict(lambda: {
                 "fred_indicators": {},
-                "yfinance_indicators": {}
+                "yfinance_indicators": {},
+                "stocks": {}
             })
 
             # FRED 데이터 수집 (날짜별로 그룹화)
@@ -54,19 +68,26 @@ class EconomicDataService:
                 yfinance_indicators, start_date_str, end_date_str, daily_data
             )
 
+            # 개별 종목 데이터 수집 (날짜별로 그룹화)
+            stocks_count = self._collect_individual_stocks(
+                start_date_str, end_date_str, daily_data
+            )
+
             # daily_stock_data에 날짜별로 저장
             saved_dates = 0
             for date_str, data in daily_data.items():
                 if self.repository.upsert_daily_data(date_str, data):
                     saved_dates += 1
-                    logger.info(f"✅ daily_stock_data 저장: {date_str} (FRED: {len(data['fred_indicators'])}, Yahoo: {len(data['yfinance_indicators'])})")
+                    logger.info(f"✅ daily_stock_data 저장: {date_str} (FRED: {len(data['fred_indicators'])}, Yahoo: {len(data['yfinance_indicators'])}, Stocks: {len(data['stocks'])})")
 
-            logger.info(f"경제 데이터 수집 완료: FRED={fred_count}개 지표, Yahoo={yahoo_count}개 지표, {saved_dates}일치 저장")
+            logger.info(f"경제 데이터 수집 완료: FRED={fred_count}개 지표, Yahoo={yahoo_count}개 지표, Stocks={stocks_count}개 종목, {saved_dates}일치 저장")
 
             return {
                 "success": True,
+                "target_date": end_date_str,
                 "fred_collected": fred_count,
                 "yahoo_collected": yahoo_count,
+                "stocks_collected": stocks_count,
                 "dates_saved": saved_dates
             }
 
@@ -231,3 +252,52 @@ class EconomicDataService:
         except Exception as e:
             logger.error(f"Yahoo Finance 데이터 가져오기 실패: {ticker} - {e}")
             return None
+
+    def _collect_individual_stocks(
+        self,
+        start_date: str,
+        end_date: str,
+        daily_data: Dict[str, Dict]
+    ) -> int:
+        """
+        개별 종목 데이터를 수집하여 daily_data에 날짜별로 그룹화합니다.
+
+        Args:
+            start_date: 시작 날짜
+            end_date: 종료 날짜
+            daily_data: 날짜별 데이터를 저장할 딕셔너리 (참조로 전달)
+
+        Returns:
+            성공적으로 수집한 종목 개수
+        """
+        success_count = 0
+
+        # 활성 종목 조회
+        active_stocks = self.repository.find_active_stocks()
+        tickers = [s["ticker"] for s in active_stocks if "ticker" in s]
+
+        logger.info(f"📊 개별 종목 데이터 수집 시작: {len(tickers)}개 종목")
+
+        for ticker in tickers:
+            try:
+                df = self._fetch_yahoo_data(ticker, start_date, end_date)
+
+                if df is not None and not df.empty:
+                    # 각 날짜별로 데이터를 그룹화
+                    for date, row in df.iterrows():
+                        date_str = date.strftime("%Y-%m-%d")
+                        close_price = float(row["Close"]) if "Close" in row and not pd.isna(row["Close"]) else None
+
+                        if close_price is not None:
+                            daily_data[date_str]["stocks"][ticker] = {
+                                "close_price": close_price
+                            }
+
+                    success_count += 1
+                    logger.info(f"✅ 종목 데이터 수집 완료: {ticker} ({len(df)}일)")
+
+            except Exception as e:
+                logger.error(f"❌ 종목 데이터 수집 실패: {ticker} - {e}")
+
+        logger.info(f"📊 개별 종목 데이터 수집 완료: {success_count}/{len(tickers)}개")
+        return success_count

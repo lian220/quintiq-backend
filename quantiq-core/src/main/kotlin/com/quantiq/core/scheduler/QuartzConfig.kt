@@ -14,30 +14,32 @@ import java.util.*
 class QuartzConfig {
 
     // ========================
-    // 1. 경제 데이터 업데이트 (06:05)
+    // 1. 경제 데이터 수집 + Vertex AI 예측 (22:00)
     // ========================
+    // CPI/NFP 발표(21:30) 직후, ISM PMI(23:00) 직전
+    // Vertex AI 예측 실행 (Fine-tuning 3-5분)
     @Bean
-    fun economicDataUpdateJobDetail(): JobDetail {
-        return JobBuilder.newJob(EconomicDataUpdateJobAdapter::class.java)
-            .withIdentity("economicDataUpdateJob")
+    fun economicDataUpdate2JobDetail(): JobDetail {
+        return JobBuilder.newJob(EconomicDataUpdate2JobAdapter::class.java)
+            .withIdentity("economicDataUpdate2Job")
             .storeDurably()
             .build()
     }
 
     @Bean
-    fun economicDataUpdateTrigger(): Trigger {
+    fun economicDataUpdate2Trigger(): Trigger {
         return TriggerBuilder.newTrigger()
-            .forJob(economicDataUpdateJobDetail())
-            .withIdentity("economicDataUpdateTrigger")
+            .forJob(economicDataUpdate2JobDetail())
+            .withIdentity("economicDataUpdate2Trigger")
             .withSchedule(
-                CronScheduleBuilder.cronSchedule("0 5 6 * * ?")
+                CronScheduleBuilder.cronSchedule("0 0 22 * * ?")
                     .inTimeZone(TimeZone.getTimeZone("Asia/Seoul"))
             )
             .build()
     }
 
     // ========================
-    // 2. 병렬 분석 (23:05)
+    // 2. 병렬 분석 (23:05) - 검증용
     // ========================
     @Bean
     fun parallelAnalysisJobDetail(): JobDetail {
@@ -60,31 +62,9 @@ class QuartzConfig {
     }
 
     // ========================
-    // 3. 경제 데이터 재수집 + Vertex AI (23:00)
+    // 3. 통합 분석 (01:30) - 검증용
     // ========================
-    @Bean
-    fun economicDataUpdate2JobDetail(): JobDetail {
-        return JobBuilder.newJob(EconomicDataUpdate2JobAdapter::class.java)
-            .withIdentity("economicDataUpdate2Job")
-            .storeDurably()
-            .build()
-    }
-
-    @Bean
-    fun economicDataUpdate2Trigger(): Trigger {
-        return TriggerBuilder.newTrigger()
-            .forJob(economicDataUpdate2JobDetail())
-            .withIdentity("economicDataUpdate2Trigger")
-            .withSchedule(
-                CronScheduleBuilder.cronSchedule("0 0 23 * * ?")
-                    .inTimeZone(TimeZone.getTimeZone("Asia/Seoul"))
-            )
-            .build()
-    }
-
-    // ========================
-    // 4. 통합 분석 (23:45)
-    // ========================
+    // 매수 후 기술적 분석 결과 검증
     @Bean
     fun combinedAnalysisJobDetail(): JobDetail {
         return JobBuilder.newJob(CombinedAnalysisJobAdapter::class.java)
@@ -99,15 +79,16 @@ class QuartzConfig {
             .forJob(combinedAnalysisJobDetail())
             .withIdentity("combinedAnalysisTrigger")
             .withSchedule(
-                CronScheduleBuilder.cronSchedule("0 45 23 * * ?")
+                CronScheduleBuilder.cronSchedule("0 30 1 * * ?")
                     .inTimeZone(TimeZone.getTimeZone("Asia/Seoul"))
             )
             .build()
     }
 
     // ========================
-    // 5. 자동 매수 (23:50)
+    // 4. 자동 매수 (00:30) - 미국 정규장 개장 1시간 후
     // ========================
+    // 초기 변동성 진정, 트렌드 확정 후 안전한 진입
     @Bean
     fun autoBuyJobDetail(): JobDetail {
         return JobBuilder.newJob(AutoBuyJobAdapter::class.java)
@@ -122,7 +103,31 @@ class QuartzConfig {
             .forJob(autoBuyJobDetail())
             .withIdentity("autoBuyTrigger")
             .withSchedule(
-                CronScheduleBuilder.cronSchedule("0 50 23 * * ?")
+                CronScheduleBuilder.cronSchedule("0 30 0 * * ?")
+                    .inTimeZone(TimeZone.getTimeZone("Asia/Seoul"))
+            )
+            .build()
+    }
+
+    // ========================
+    // 5. 감정 분석 (02:30) - 검증용
+    // ========================
+    // 뉴스 감정 분석 결과로 매수 결정 검증
+    @Bean
+    fun sentimentAnalysisJobDetail(): JobDetail {
+        return JobBuilder.newJob(ParallelAnalysisJob::class.java)
+            .withIdentity("sentimentAnalysisJob")
+            .storeDurably()
+            .build()
+    }
+
+    @Bean
+    fun sentimentAnalysisTrigger(): Trigger {
+        return TriggerBuilder.newTrigger()
+            .forJob(sentimentAnalysisJobDetail())
+            .withIdentity("sentimentAnalysisTrigger")
+            .withSchedule(
+                CronScheduleBuilder.cronSchedule("0 30 2 * * ?")
                     .inTimeZone(TimeZone.getTimeZone("Asia/Seoul"))
             )
             .build()

@@ -17,12 +17,20 @@ class WebClientRestApiAdapter(
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    override fun callEconomicDataCollectionApi(url: String): CompletableFuture<String> {
+    override fun callEconomicDataCollectionApi(url: String, targetDate: String?): CompletableFuture<String> {
         return try {
-            logger.info("REST API 호출: $url")
+            val dateInfo = targetDate ?: "당일"
+            logger.info("REST API 호출: $url (기준일: $dateInfo)")
+
+            val requestBody = if (targetDate != null) {
+                mapOf("target_date" to targetDate)
+            } else {
+                emptyMap()
+            }
 
             webClient.post()
                 .uri(url)
+                .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String::class.java)
                 .toFuture()
