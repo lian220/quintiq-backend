@@ -179,40 +179,156 @@ class VertexAIService(
             logger.info("SLACK_THREAD_TS 환경변수 추가됨: $it")
         }
 
-        // .env.prod 파일에서 MongoDB 환경변수 로드
+        // .env.prod 파일에서 MongoDB 환경변수 로드 시도
         val envFile = loadEnvFile()
 
-        // MongoDB 환경변수 추가
+        // MongoDB 환경변수 추가 (우선순위: .env.prod > Spring 설정)
+        var mongoUrlSet = false
+        var mongoUserSet = false
+        var mongoPasswordSet = false
+        var mongoDatabaseSet = false
+
+        // 1. .env.prod 파일에서 읽기 시도
         envFile["MONGO_URL"]?.let {
             envVars["MONGO_URL"] = it
-            logger.info("MONGO_URL 환경변수 추가됨")
+            mongoUrlSet = true
+            logger.info("✅ MONGO_URL 환경변수 추가됨 (.env.prod)")
         }
         envFile["MONGO_USER"]?.let {
             envVars["MONGO_USER"] = it
-            logger.info("MONGO_USER 환경변수 추가됨")
+            mongoUserSet = true
+            logger.info("✅ MONGO_USER 환경변수 추가됨 (.env.prod)")
         }
         envFile["MONGO_PASSWORD"]?.let {
             envVars["MONGO_PASSWORD"] = it
-            logger.info("MONGO_PASSWORD 환경변수 추가됨 (***)")
+            mongoPasswordSet = true
+            logger.info("✅ MONGO_PASSWORD 환경변수 추가됨 (.env.prod) (***)")
         }
         envFile["MONGODB_DATABASE"]?.let {
             envVars["MONGODB_DATABASE"] = it
-            logger.info("MONGODB_DATABASE 환경변수 추가됨: $it")
+            mongoDatabaseSet = true
+            logger.info("✅ MONGODB_DATABASE 환경변수 추가됨 (.env.prod): $it")
+        }
+
+        // 2. .env.prod에서 못 읽었으면 Spring 설정에서 파싱
+        if (!mongoUrlSet || !mongoUserSet || !mongoPasswordSet) {
+            logger.warn("⚠️ .env.prod에서 MongoDB 환경변수를 찾지 못했습니다. Spring 설정에서 파싱 시도...")
+            logger.info("MongoDB URI from Spring: ${maskPassword(mongodbUri)}")
+
+            try {
+                val parsed = parseMongoDbUri(mongodbUri)
+
+                if (!mongoUrlSet && parsed.host.isNotEmpty()) {
+                    envVars["MONGO_URL"] = parsed.host
+                    logger.info("✅ MONGO_URL 환경변수 추가됨 (Spring 설정): ${parsed.host}")
+                    mongoUrlSet = true
+                }
+                if (!mongoUserSet && parsed.username.isNotEmpty()) {
+                    envVars["MONGO_USER"] = parsed.username
+                    logger.info("✅ MONGO_USER 환경변수 추가됨 (Spring 설정): ${parsed.username}")
+                    mongoUserSet = true
+                }
+                if (!mongoPasswordSet && parsed.password.isNotEmpty()) {
+                    envVars["MONGO_PASSWORD"] = parsed.password
+                    logger.info("✅ MONGO_PASSWORD 환경변수 추가됨 (Spring 설정) (***)")
+                    mongoPasswordSet = true
+                }
+                if (!mongoDatabaseSet && parsed.database.isNotEmpty()) {
+                    envVars["MONGODB_DATABASE"] = parsed.database
+                    logger.info("✅ MONGODB_DATABASE 환경변수 추가됨 (Spring 설정): ${parsed.database}")
+                    mongoDatabaseSet = true
+                }
+            } catch (e: Exception) {
+                logger.error("❌ MongoDB URI 파싱 실패: ${e.message}", e)
+            }
+        }
+
+        // 3. 필수 환경변수 검증
+        if (!mongoUrlSet) {
+            logger.error("❌ MONGO_URL 환경변수를 설정할 수 없습니다!")
+            throw IllegalStateException("MONGO_URL 환경변수가 설정되지 않았습니다. .env.prod 또는 Spring 설정을 확인하세요.")
         }
 
         // Slack 환경변수 추가
         envFile["SLACK_BOT_TOKEN"]?.let {
             envVars["SLACK_BOT_TOKEN"] = it
-            logger.info("SLACK_BOT_TOKEN 환경변수 추가됨 (***)")
+            logger.info("✅ SLACK_BOT_TOKEN 환경변수 추가됨 (***)")
         }
         envFile["SLACK_CHANNEL"]?.let {
             envVars["SLACK_CHANNEL"] = it
-            logger.info("SLACK_CHANNEL 환경변수 추가됨: $it")
+            logger.info("✅ SLACK_CHANNEL 환경변수 추가됨: $it")
         }
 
-        logger.info("총 환경 변수 ${envVars.size}개 설정됨")
+        logger.info("=" .repeat(60))
+        logger.info("📋 총 환경 변수 ${envVars.size}개 설정 완료")
+        logger.info("  - MONGO_URL: ${if (mongoUrlSet) "✅" else "❌"}")
+        logger.info("  - MONGO_USER: ${if (mongoUserSet) "✅" else "❌"}")
+        logger.info("  - MONGO_PASSWORD: ${if (mongoPasswordSet) "✅" else "❌"}")
+        logger.info("  - MONGODB_DATABASE: ${if (mongoDatabaseSet) "✅ (${envVars["MONGODB_DATABASE"]})" else "❌"}")
+        logger.info("=" .repeat(60))
 
         return envVars
+    }
+
+    /**
+     * MongoDB URI 파싱
+     * mongodb://username:password@host:port/database?options
+     * mongodb+srv://username:password@host/database?options
+     */
+    private data class MongoDbUriParts(
+        val host: String,
+        val username: String,
+        val password: String,
+        val database: String
+    )
+
+    private fun parseMongoDbUri(uri: String): MongoDbUriParts {
+        // mongodb:// 또는 mongodb+srv:// 제거
+        val cleanUri = uri.removePrefix("mongodb://").removePrefix("mongodb+srv://")
+
+        var username = ""
+        var password = ""
+        var host = ""
+        var database = "stock_trading" // 기본값
+
+        // @ 기준으로 인증 부분과 호스트 부분 분리
+        if ("@" in cleanUri) {
+            val parts = cleanUri.split("@", limit = 2)
+            val authPart = parts[0]
+            val hostPart = parts[1]
+
+            // 인증 정보 파싱
+            if (":" in authPart) {
+                val authParts = authPart.split(":", limit = 2)
+                username = java.net.URLDecoder.decode(authParts[0], "UTF-8")
+                password = java.net.URLDecoder.decode(authParts[1], "UTF-8")
+            }
+
+            // 호스트 및 데이터베이스 파싱
+            val hostAndDb = hostPart.split("?")[0] // 옵션 제거
+            val hostDbParts = hostAndDb.split("/")
+            host = hostDbParts[0]
+            if (hostDbParts.size > 1 && hostDbParts[1].isNotEmpty()) {
+                database = hostDbParts[1]
+            }
+        } else {
+            // @ 없으면 인증 없음
+            val hostAndDb = cleanUri.split("?")[0]
+            val hostDbParts = hostAndDb.split("/")
+            host = hostDbParts[0]
+            if (hostDbParts.size > 1 && hostDbParts[1].isNotEmpty()) {
+                database = hostDbParts[1]
+            }
+        }
+
+        return MongoDbUriParts(host, username, password, database)
+    }
+
+    /**
+     * 비밀번호 마스킹
+     */
+    private fun maskPassword(uri: String): String {
+        return uri.replace(Regex(":([^@]+)@"), ":***@")
     }
 
     /**

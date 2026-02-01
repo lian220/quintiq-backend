@@ -161,7 +161,7 @@ slack:
 # Google Cloud Configuration
 # ============================================
 gcp:
-  enabled: ${GCP_ENABLED:true}
+  enabled: true  # 무조건 활성화 (운영 MongoDB 필수)
   project-id: ${GCP_PROJECT_ID:}
   region: ${GCP_REGION:us-central1}
   credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
