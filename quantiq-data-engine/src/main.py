@@ -9,6 +9,9 @@ import logging
 import json
 import time
 import threading
+import subprocess
+import sys
+from pathlib import Path
 from fastapi import FastAPI
 import uvicorn
 from confluent_kafka import Consumer, KafkaError
@@ -51,7 +54,8 @@ def read_root():
             "economic.data.update.request",
             "analysis.technical.request",
             "analysis.sentiment.request",
-            "analysis.combined.request"
+            "analysis.combined.request",
+            "ml.package.upload.request"
         ],
         "api_purpose": "Read-only health checks and status queries",
         "timestamp": datetime.now(KST).isoformat()
@@ -93,12 +97,13 @@ def main():
 
     consumer = Consumer(conf)
 
-    # 토픽 구독 (경제 데이터 + 분석 요청)
+    # 토픽 구독 (경제 데이터 + 분석 요청 + ML 패키지)
     topics = [
         settings.KAFKA_TOPIC_ECONOMIC_DATA_UPDATE_REQUEST,
         "analysis.technical.request",
         "analysis.sentiment.request",
-        "analysis.combined.request"
+        "analysis.combined.request",
+        "ml.package.upload.request"
     ]
     consumer.subscribe(topics)
     logger.info(f"Subscribed to topics: {topics}")
@@ -291,6 +296,123 @@ def main():
                     except Exception as e:
                         logger.error(f"❌ 통합 분석 실패: {e}")
                         KafkaEventPublisher.publish("ANALYSIS_FAILED", {
+                            "status": "failed",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "error": str(e)
+                        })
+
+                # ML 패키지 업로드 요청 처리
+                elif topic_name == "ml.package.upload.request":
+                    payload = message.get("payload", message)
+                    request_id = payload.get("requestId", "unknown")
+                    thread_ts = payload.get("threadTs")
+                    script_path = payload.get("scriptPath", "predict_optimized.py")
+
+                    logger.info("=" * 80)
+                    logger.info("ML 패키지 업로드 요청 Kafka 메시지 수신")
+                    logger.info(f"Request ID: {request_id}")
+                    logger.info(f"Script Path: {script_path}")
+                    logger.info(f"Thread TS: {thread_ts}")
+                    logger.info("=" * 80)
+
+                    # 🔔 업로드 시작 알림
+                    SlackNotifier.notify_ml_package_upload_start(request_id, thread_ts)
+
+                    start_time = time.time()
+                    try:
+                        # upload_to_gcs.py 스크립트 경로
+                        script_dir = Path(__file__).parent / "scripts" / "utils"
+                        upload_script = script_dir / "upload_to_gcs.py"
+                        predict_script = script_dir / script_path
+
+                        if not upload_script.exists():
+                            raise FileNotFoundError(f"업로드 스크립트를 찾을 수 없습니다: {upload_script}")
+                        if not predict_script.exists():
+                            raise FileNotFoundError(f"예측 스크립트를 찾을 수 없습니다: {predict_script}")
+
+                        logger.info(f"업로드 스크립트: {upload_script}")
+                        logger.info(f"예측 스크립트: {predict_script}")
+
+                        # 스크립트 실행
+                        logger.info("GCS 업로드 스크립트 실행 중...")
+                        result = subprocess.run(
+                            [sys.executable, str(upload_script), "--file", str(predict_script)],
+                            capture_output=True,
+                            text=True,
+                            timeout=300  # 5분 타임아웃
+                        )
+
+                        # 로그 출력
+                        if result.stdout:
+                            logger.info("=== 스크립트 출력 ===")
+                            for line in result.stdout.split('\n'):
+                                if line.strip():
+                                    logger.info(line)
+
+                        if result.stderr:
+                            logger.warning("=== 스크립트 경고/오류 ===")
+                            for line in result.stderr.split('\n'):
+                                if line.strip():
+                                    logger.warning(line)
+
+                        # 실행 결과 확인
+                        if result.returncode != 0:
+                            error_msg = f"스크립트 실행 실패 (exit code: {result.returncode})"
+                            if result.stderr:
+                                error_msg += f"\n{result.stderr}"
+                            raise RuntimeError(error_msg)
+
+                        # 성공 응답에서 GCS URI와 버전 추출
+                        gcs_uri = None
+                        version = None
+                        combined_output = result.stdout + "\n" + result.stderr
+
+                        for line in combined_output.split('\n'):
+                            if "GCS URI:" in line:
+                                gcs_uri = line.split("GCS URI:")[-1].strip()
+                            if "패키지 버전:" in line or "새 버전:" in line:
+                                try:
+                                    version_str = line.split(":")[-1].strip().replace("v", "")
+                                    version = int(version_str)
+                                except (ValueError, IndexError):
+                                    pass
+
+                        elapsed_time = time.time() - start_time
+                        logger.info("✅ ML 패키지 업로드 완료")
+
+                        # 🔔 업로드 완료 알림
+                        upload_summary = {
+                            "gcs_uri": gcs_uri,
+                            "version": f"v{version}" if version else "unknown",
+                            "duration": f"{elapsed_time:.2f}초"
+                        }
+                        SlackNotifier.notify_ml_package_upload_success(request_id, upload_summary, thread_ts)
+
+                        # 완료 이벤트 발행
+                        KafkaEventPublisher.publish("ML_PACKAGE_UPLOADED", {
+                            "status": "success",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "duration": elapsed_time,
+                            "gcsUri": gcs_uri,
+                            "version": version
+                        })
+
+                    except subprocess.TimeoutExpired:
+                        error_msg = "스크립트 실행 타임아웃 (5분 초과)"
+                        logger.error(f"❌ {error_msg}")
+                        SlackNotifier.notify_ml_package_upload_error(request_id, error_msg, thread_ts)
+                        KafkaEventPublisher.publish("ML_PACKAGE_UPLOAD_FAILED", {
+                            "status": "failed",
+                            "timestamp": datetime.now(KST).isoformat(),
+                            "requestId": request_id,
+                            "error": error_msg
+                        })
+                    except Exception as e:
+                        logger.error(f"❌ ML 패키지 업로드 실패: {e}")
+                        SlackNotifier.notify_ml_package_upload_error(request_id, str(e), thread_ts)
+                        KafkaEventPublisher.publish("ML_PACKAGE_UPLOAD_FAILED", {
                             "status": "failed",
                             "timestamp": datetime.now(KST).isoformat(),
                             "requestId": request_id,

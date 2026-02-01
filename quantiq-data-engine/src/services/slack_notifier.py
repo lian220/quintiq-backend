@@ -315,3 +315,128 @@ class SlackNotifier:
         ]
 
         SlackNotifier._post_message("", attachments, thread_ts=thread_ts)
+
+    @staticmethod
+    def notify_ml_package_upload_start(request_id: str, parent_thread_ts: Optional[str] = None) -> Optional[str]:
+        """
+        ML 패키지 업로드 시작 알림 (스레드 답글)
+
+        Args:
+            request_id: 요청 ID
+            parent_thread_ts: 부모 스레드 타임스탬프
+
+        Returns:
+            메시지 타임스탬프
+        """
+        if parent_thread_ts:
+            SlackNotifier._thread_timestamps[request_id] = parent_thread_ts
+            logger.info(f"📌 ML 업로드 스레드 연결: request_id={request_id}, thread_ts={parent_thread_ts}")
+
+        text = "📦 ML 패키지 GCS 업로드 시작"
+        attachments = [
+            {
+                "color": "0099cc",
+                "title": "ML 패키지 업로드 진행 중",
+                "text": "predict_optimized.py 패키지를 GCS에 업로드하고 있습니다.",
+                "fields": [
+                    {"title": "Request ID", "value": request_id, "short": True},
+                    {"title": "Timestamp", "value": datetime.now(KST).isoformat(), "short": True},
+                    {"title": "Status", "value": "🔄 In Progress", "short": True},
+                ],
+                "footer": "Quantiq Data Engine",
+                "ts": int(datetime.now(KST).timestamp())
+            }
+        ]
+
+        thread_ts = SlackNotifier._thread_timestamps.get(request_id)
+        message_ts = SlackNotifier._post_message(text, attachments, thread_ts=thread_ts)
+
+        if not thread_ts and not settings.SLACK_BOT_TOKEN:
+            logger.warning(f"⚠️ 스레드 답글 불가: Bot Token 없음 (request_id={request_id})")
+
+        return message_ts
+
+    @staticmethod
+    def notify_ml_package_upload_success(request_id: str, upload_summary: dict = None, thread_ts: Optional[str] = None):
+        """
+        ML 패키지 업로드 완료 알림 (스레드 답글)
+
+        Args:
+            request_id: 요청 ID
+            upload_summary: 업로드 요약 (gcs_uri, version, duration)
+            thread_ts: 스레드 타임스탬프
+        """
+        if upload_summary is None:
+            upload_summary = {}
+
+        if not thread_ts:
+            thread_ts = SlackNotifier._thread_timestamps.get(request_id)
+
+        if not thread_ts and not settings.SLACK_BOT_TOKEN:
+            logger.warning(f"⚠️ 스레드 답글 불가: Bot Token 없음 (request_id={request_id})")
+
+        gcs_uri = upload_summary.get("gcs_uri", "N/A")
+        version = upload_summary.get("version", "unknown")
+        duration = upload_summary.get("duration", "N/A")
+
+        text = "✅ ML 패키지 업로드 완료"
+        attachments = [
+            {
+                "color": "28a745",
+                "title": "📦 업로드 결과",
+                "text": f"패키지 버전 {version}이 GCS에 업로드되었습니다.",
+                "fields": [
+                    {"title": "Request ID", "value": request_id, "short": True},
+                    {"title": "소요 시간", "value": duration, "short": True},
+                    {"title": "패키지 버전", "value": version, "short": True},
+                    {"title": "GCS URI", "value": gcs_uri, "short": False},
+                    {"title": "완료 시각", "value": datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S"), "short": True},
+                ],
+                "footer": "Quantiq Data Engine",
+                "ts": int(datetime.now(KST).timestamp())
+            }
+        ]
+
+        SlackNotifier._post_message(text, attachments, thread_ts=thread_ts)
+
+        if request_id in SlackNotifier._thread_timestamps:
+            del SlackNotifier._thread_timestamps[request_id]
+
+    @staticmethod
+    def notify_ml_package_upload_error(request_id: str, error: str, thread_ts: Optional[str] = None):
+        """
+        ML 패키지 업로드 오류 알림 (스레드 답글)
+
+        Args:
+            request_id: 요청 ID
+            error: 오류 메시지
+            thread_ts: 스레드 타임스탬프
+        """
+        if not thread_ts:
+            thread_ts = SlackNotifier._thread_timestamps.get(request_id)
+
+        if not thread_ts and not settings.SLACK_BOT_TOKEN:
+            logger.warning(f"⚠️ 스레드 답글 불가: Bot Token 없음 (request_id={request_id})")
+
+        text = "⚠️ ML 패키지 업로드 오류"
+        attachments = [
+            {
+                "color": "dc3545",
+                "title": "ML 패키지 업로드 실패",
+                "text": "ML 패키지 업로드 중 오류가 발생했습니다.",
+                "fields": [
+                    {"title": "Request ID", "value": request_id, "short": True},
+                    {"title": "Error", "value": error, "short": False},
+                    {"title": "Timestamp", "value": datetime.now(KST).isoformat(), "short": True},
+                    {"title": "Action", "value": "로그를 확인하고 수동 재시도를 고려하세요", "short": False},
+                    {"title": "Status", "value": "❌ Failed", "short": True},
+                ],
+                "footer": "Quantiq Data Engine",
+                "ts": int(datetime.now(KST).timestamp())
+            }
+        ]
+
+        SlackNotifier._post_message(text, attachments, thread_ts=thread_ts)
+
+        if request_id in SlackNotifier._thread_timestamps:
+            del SlackNotifier._thread_timestamps[request_id]
